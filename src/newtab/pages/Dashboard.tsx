@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   getTree,
   flatten,
@@ -74,6 +75,13 @@ interface HistoryHit {
   source: "history" | "bookmark";
 }
 
+interface MenuAnchor {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
 interface SearchCommandItem {
   id: string;
   title: string;
@@ -102,7 +110,7 @@ export default function Dashboard({
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [ctxMenu, setCtxMenu] = useState<
-    | { id: string; url: string; x: number; y: number; title: string }
+    | { id: string; url: string; title: string; anchor: MenuAnchor }
     | null
   >(null);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
@@ -997,8 +1005,12 @@ export default function Dashboard({
                   id: b.id,
                   url: b.url,
                   title: b.title,
-                  x: e.clientX,
-                  y: e.clientY,
+                  anchor: {
+                    left: e.clientX,
+                    right: e.clientX,
+                    top: e.clientY,
+                    bottom: e.clientY,
+                  },
                 });
               }}
               className={cn(
@@ -1042,12 +1054,17 @@ export default function Dashboard({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  const rect = e.currentTarget.getBoundingClientRect();
                   setCtxMenu({
                     id: b.id,
                     url: b.url,
                     title: b.title,
-                    x: e.clientX,
-                    y: e.clientY,
+                    anchor: {
+                      left: rect.left,
+                      right: rect.right,
+                      top: rect.top,
+                      bottom: rect.bottom,
+                    },
                   });
                 }}
                 className="absolute bottom-2 right-2 rounded p-1 text-muted-foreground opacity-0 hover:bg-accent group-hover:opacity-100"
@@ -1487,32 +1504,52 @@ function Pager({
 }
 
 function BookmarkCtxMenu({
-  x,
-  y,
+  anchor,
   onCopy,
   onQr,
+  onClose,
 }: {
   id: string;
   url: string;
   title: string;
-  x: number;
-  y: number;
+  anchor: MenuAnchor;
   onCopy: () => void;
   onQr: () => void;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ left: x, top: y });
+  const [pos, setPos] = useState({
+    left: anchor.right,
+    top: anchor.bottom + 6,
+  });
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const pad = 8;
-    const left = Math.min(x, window.innerWidth - r.width - pad);
-    const top = Math.min(y, window.innerHeight - r.height - pad);
-    setPos({ left, top });
-  }, [x, y]);
-  return (
+    const place = () => {
+      const el = ref.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const pad = 8;
+      const gap = 6;
+      const preferredLeft = anchor.right - r.width;
+      const maxLeft = Math.max(pad, window.innerWidth - r.width - pad);
+      const left = Math.min(Math.max(pad, preferredLeft), maxLeft);
+      const below = anchor.bottom + gap;
+      const above = anchor.top - r.height - gap;
+      const fitsBelow = below + r.height + pad <= window.innerHeight;
+      const top = fitsBelow ? below : Math.max(pad, above);
+      setPos({ left, top });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [anchor]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return createPortal(
     <div
       ref={ref}
       onClick={(e) => e.stopPropagation()}
@@ -1531,6 +1568,7 @@ function BookmarkCtxMenu({
       >
         生成二维码
       </button>
-    </div>
+    </div>,
+    document.body,
   );
 }
