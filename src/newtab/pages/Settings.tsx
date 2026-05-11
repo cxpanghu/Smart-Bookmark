@@ -8,12 +8,8 @@ import type { AccentPreset, Settings, ThemePreset } from "@/types";
 import { useT } from "@/lib/i18n";
 import { testAi } from "@/lib/ai";
 import { BUILTIN_ENGINES, faviconFor } from "@/lib/engines";
-import { Check, CheckCircle2, XCircle, Loader2, Flame, ExternalLink } from "lucide-react";
-import { COMMON_LANGUAGES, clearTrendingCache } from "@/lib/github";
-import type { TrendingMode, TrendingRange, TrendingSort } from "@/types";
-import { toast } from "@/components/ui/toast";
+import { Check, CheckCircle2, XCircle, Loader2, Clock } from "lucide-react";
 import { THEME_PRESETS } from "@/lib/themePresets";
-import { HOME_WIDGETS } from "@/lib/homeWidgets";
 import { cn } from "@/lib/utils";
 
 const ENGINE_LIST = BUILTIN_ENGINES.slice(0, 10);
@@ -426,192 +422,34 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Flame className="h-4 w-4 text-rose-500" />
-            {t("settings.discover")}
-          </CardTitle>
+          <CardTitle>{t("settings.homeWidgets")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Row label={t("settings.homeWidgets")}>
-            <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">
-                {t("settings.homeWidgetsHint")}
-              </p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {HOME_WIDGETS.map((w) => {
-                  const checked = s[w.key] ?? true;
-                  const Icon = w.Icon;
-                  return (
-                    <label
-                      key={w.key}
-                      className={cn(
-                        "group flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition",
-                        checked
-                          ? "border-primary/40 bg-primary/5 hover:bg-primary/10"
-                          : "border-border bg-card/40 hover:bg-accent",
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br",
-                          w.iconAccent,
-                        )}
-                      >
-                        <Icon className="h-3.5 w-3.5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium leading-tight">
-                          {t(w.titleKey)}
-                        </div>
-                        <div className="mt-1 text-[11.5px] leading-relaxed text-muted-foreground">
-                          {t(w.hintKey)}
-                        </div>
-                      </div>
-                      <Switch
-                        checked={checked}
-                        onCheckedChange={(v) =>
-                          update({ [w.key]: v } as Partial<Settings>)
-                        }
-                      />
-                    </label>
-                  );
-                })}
+          <Row label={t("settings.showTopSites")}>
+            <label
+              className={cn(
+                "group flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition",
+                (s.showTopSites ?? true)
+                  ? "border-primary/40 bg-primary/5 hover:bg-primary/10"
+                  : "border-border bg-card/40 hover:bg-accent",
+              )}
+            >
+              <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500/20 to-indigo-500/20 text-sky-600 dark:text-sky-400">
+                <Clock className="h-3.5 w-3.5" />
               </div>
-            </div>
-          </Row>
-          <Row label={t("settings.githubToken")}>
-            <div className="space-y-2">
-              <Input
-                type="password"
-                value={s.githubToken ?? ""}
-                placeholder="ghp_••••••••••••••••••••••••••••••••••••"
-                onChange={(e) => update({ githubToken: e.target.value })}
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium leading-tight">
+                  {t("settings.showTopSites")}
+                </div>
+                <div className="mt-1 text-[11.5px] leading-relaxed text-muted-foreground">
+                  {t("settings.showTopSitesHint")}
+                </div>
+              </div>
+              <Switch
+                checked={s.showTopSites ?? true}
+                onCheckedChange={(v) => update({ showTopSites: v })}
               />
-              <div className="flex items-center gap-2">
-                <a
-                  href="https://github.com/settings/tokens/new?description=Smart%20Bookmark&scopes=public_repo"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                >
-                  {t("settings.githubTokenCreate")}
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={async () => {
-                    await clearTrendingCache();
-                    toast("已清空 GitHub Trending 缓存", "success");
-                  }}
-                >
-                  清空缓存
-                </Button>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {t("settings.githubTokenHint")}
-              </div>
-            </div>
-          </Row>
-          <Row label={t("settings.discoverDefaults")}>
-            <div className="flex flex-wrap items-center gap-2">
-              {(
-                [
-                  ["created", t("discover.mode.created")],
-                  ["hottest", t("discover.mode.hottest")],
-                ] as const
-              ).map(([v, label]) => (
-                <Button
-                  key={v}
-                  size="sm"
-                  variant={
-                    (s.discoverDefaultMode ?? "created") === v
-                      ? "default"
-                      : "outline"
-                  }
-                  onClick={() =>
-                    update({ discoverDefaultMode: v as TrendingMode })
-                  }
-                >
-                  {label}
-                </Button>
-              ))}
-              <div className="mx-2 h-5 w-px bg-border" />
-              {(
-                [
-                  ["daily", t("discover.range.daily")],
-                  ["weekly", t("discover.range.weekly")],
-                  ["monthly", t("discover.range.monthly")],
-                  ["yearly", t("discover.range.yearly")],
-                ] as const
-              ).map(([v, label]) => (
-                <Button
-                  key={v}
-                  size="sm"
-                  variant={
-                    (s.discoverDefaultRange ?? "weekly") === v
-                      ? "default"
-                      : "outline"
-                  }
-                  onClick={() =>
-                    update({ discoverDefaultRange: v as TrendingRange })
-                  }
-                >
-                  {label}
-                </Button>
-              ))}
-              <div className="mx-2 h-5 w-px bg-border" />
-              <select
-                value={s.discoverDefaultLanguage ?? ""}
-                onChange={(e) =>
-                  update({ discoverDefaultLanguage: e.target.value })
-                }
-                className="rounded-md border bg-background px-2 py-1 text-sm"
-              >
-                <option value="">{t("discover.language.all")}</option>
-                {COMMON_LANGUAGES.map((l) => (
-                  <option key={l} value={l}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </Row>
-          <Row label={t("settings.discoverSort")}>
-            <div className="space-y-1.5">
-              <div className="flex flex-wrap items-center gap-2">
-                {(
-                  [
-                    ["auto", t("discover.sort.auto")],
-                    [
-                      "velocity-since-creation",
-                      t("discover.sort.velocity-since-creation"),
-                    ],
-                    ["recent-growth", t("discover.sort.recent-growth")],
-                    ["total-stars", t("discover.sort.total-stars")],
-                  ] as const
-                ).map(([v, label]) => (
-                  <Button
-                    key={v}
-                    size="sm"
-                    variant={
-                      (s.discoverDefaultSort ?? "auto") === v
-                        ? "default"
-                        : "outline"
-                    }
-                    onClick={() =>
-                      update({ discoverDefaultSort: v as TrendingSort })
-                    }
-                    title={t(`discover.sort.${v}.hint`)}
-                  >
-                    {label}
-                  </Button>
-                ))}
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                {t("settings.discoverSortHint")}
-              </p>
-            </div>
+            </label>
           </Row>
         </CardContent>
       </Card>

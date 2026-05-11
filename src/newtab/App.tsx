@@ -143,7 +143,6 @@ export default function App() {
             <Dashboard
               settings={settings}
               initialQuery={initialQuery}
-              onOpenDiscover={() => setTabWithHash("discover")}
             />
           )}
           {tab === "discover" && <InfoRadar settings={settings} />}

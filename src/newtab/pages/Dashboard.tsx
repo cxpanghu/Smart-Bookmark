@@ -11,7 +11,7 @@ import {
   findFolder,
   moveBookmark,
 } from "@/lib/bookmarks";
-import type { BookmarkNode, FlatBookmark, Settings, TrendingMode, TrendingRange } from "@/types";
+import type { BookmarkNode, FlatBookmark, Settings } from "@/types";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -29,16 +29,11 @@ import {
   Folder,
   ChevronRight,
   X,
-  Flame,
   Clock,
-  Sparkles,
-  TrendingUp,
   HardDriveDownload,
   Settings2,
   Wand2,
 } from "lucide-react";
-import TrendingPanel from "@/components/TrendingPanel";
-import { rangeToWindowDays } from "@/lib/github";
 import { setSettings } from "@/lib/storage";
 import { useT } from "@/lib/i18n";
 import { toast } from "@/components/ui/toast";
@@ -46,7 +41,6 @@ import QrDialog from "./QrDialog";
 import FolderTree from "@/components/FolderTree";
 import EngineSwitcher from "@/components/EngineSwitcher";
 import { faviconFor, findEngine } from "@/lib/engines";
-import InfoCollections from "@/components/InfoCollections";
 import HideWidgetButton from "@/components/HideWidgetButton";
 import { Tooltip } from "@/components/ui/tooltip";
 import { rankSearchItems } from "@/lib/searchRank";
@@ -54,8 +48,6 @@ import { rankSearchItems } from "@/lib/searchRank";
 interface Props {
   settings: Settings;
   initialQuery?: string;
-  /** 从首页热门 widget 跳到「发现」页（与地址栏 hash 同步，避免点击无反应） */
-  onOpenDiscover?: () => void;
 }
 
 type DashboardTabId =
@@ -95,7 +87,6 @@ interface SearchCommandItem {
 export default function Dashboard({
   settings,
   initialQuery,
-  onOpenDiscover,
 }: Props) {
   const t = useT();
   const [tree, setTree] = useState<BookmarkNode[]>([]);
@@ -119,12 +110,6 @@ export default function Dashboard({
   const [historyHits, setHistoryHits] = useState<HistoryHit[]>([]);
   const [searchFocused, setSearchFocused] = useState(false);
   const [activeCommand, setActiveCommand] = useState(0);
-  const [widgetRange, setWidgetRange] = useState<TrendingRange>(
-    settings.discoverDefaultRange ?? "weekly",
-  );
-  const [widgetMode, setWidgetMode] = useState<TrendingMode>(
-    settings.discoverDefaultMode ?? "created",
-  );
   const [pageSize, setPageSize] = useState<number>(() => {
     const raw = localStorage.getItem("sb_pageSize");
     if (raw === "Infinity") return Infinity;
@@ -602,19 +587,11 @@ export default function Dashboard({
 
   const greeting = useGreeting();
   const showHero = !selected && !query.trim();
-  const showGithubTrendingWidget = settings.showGithubTrendingWidget ?? true;
-  const showInfoCollections = settings.showInfoCollections ?? true;
   const showTopSites = settings.showTopSites ?? true;
   const hasTopSitesSection = showTopSites && topSites.length > 0;
 
   const hideHomeWidget = useCallback(
-    async (
-      key:
-        | "showGithubTrendingWidget"
-        | "showInfoCollections"
-        | "showTopSites",
-      shortNameKey: string,
-    ) => {
+    async (key: "showTopSites", shortNameKey: string) => {
       await setSettings({ [key]: false });
       toast(t("home.widgetHidden", t(shortNameKey)), "success");
     },
@@ -918,151 +895,6 @@ export default function Dashboard({
               </section>
             )}
 
-            {showGithubTrendingWidget && (
-              <section
-                className={cn(
-                  "group/widget col-span-1",
-                  "md:col-span-12",
-                )}
-              >
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500/20 to-rose-500/20 text-rose-500">
-                  <Flame className="h-3.5 w-3.5" />
-                </div>
-                <h2 className="text-sm font-semibold tracking-tight">
-                  {t("discover.widget.title")}
-                </h2>
-                <div
-                  className="inline-flex items-center gap-0.5 rounded-lg border bg-card/80 p-0.5 text-[11px]"
-                  role="tablist"
-                  aria-label="Mode"
-                >
-                  {(["created", "hottest"] as TrendingMode[]).map((m) => {
-                    const Icon = m === "created" ? Sparkles : TrendingUp;
-                    return (
-                      <Tooltip
-                        key={m}
-                        content={t(`discover.mode.${m}.hint`)}
-                      >
-                        <button
-                          type="button"
-                          role="tab"
-                          aria-selected={widgetMode === m}
-                          onClick={() => setWidgetMode(m)}
-                          className={cn(
-                            "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium transition",
-                            widgetMode === m
-                              ? "bg-primary text-primary-foreground shadow-sm"
-                              : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                          )}
-                        >
-                          <Icon className="h-3 w-3" />
-                          {t(`discover.mode.${m}`)}
-                        </button>
-                      </Tooltip>
-                    );
-                  })}
-                </div>
-                <div
-                  className="inline-flex items-center gap-0.5 rounded-lg border bg-card/80 p-0.5 text-[11px]"
-                  role="tablist"
-                  aria-label={t("discover.widget.title")}
-                >
-                  {(["daily", "weekly", "monthly", "yearly"] as TrendingRange[]).map(
-                    (r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        role="tab"
-                        aria-selected={widgetRange === r}
-                        onClick={() => setWidgetRange(r)}
-                        className={cn(
-                          "rounded-md px-2 py-0.5 font-medium transition",
-                          widgetRange === r
-                            ? "bg-primary text-primary-foreground shadow-sm"
-                            : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                        )}
-                      >
-                        {t(`discover.range.${r}`)}
-                      </button>
-                    ),
-                  )}
-                </div>
-                <div className="flex-1" />
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (onOpenDiscover) {
-                      onOpenDiscover();
-                    } else {
-                      const p = new URLSearchParams(window.location.hash.slice(1));
-                      p.set("tab", "discover");
-                      const s = p.toString();
-                      window.location.hash = s ? "#" + s : "#";
-                    }
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                  className="relative z-10 cursor-pointer rounded-md px-2 py-1 text-xs text-muted-foreground transition hover:bg-accent hover:text-primary"
-                >
-                  {t("discover.widget.viewAll")}
-                </button>
-                <HideWidgetButton
-                  variant="inline"
-                  onHide={() =>
-                    hideHomeWidget(
-                      "showGithubTrendingWidget",
-                      "home.widgetShort.githubTrending",
-                    )
-                  }
-                  label={t("home.hideWidget")}
-                  tooltip={t(
-                    "home.hideWidgetTooltip",
-                    t("home.widgetShort.githubTrending"),
-                  )}
-                />
-              </div>
-              <p className="text-[11px] leading-relaxed text-muted-foreground/90">
-                {t(
-                  "discover.widget.hint",
-                  t(`discover.range.${widgetRange}`),
-                  String(rangeToWindowDays(widgetRange)),
-                )}{" "}
-                {t(`discover.mode.${widgetMode}.hint`)}
-              </p>
-              <TrendingPanel
-                settings={settings}
-                limit={8}
-                compact
-                hideControls
-                range={widgetRange}
-                onRangeChange={setWidgetRange}
-                mode={widgetMode}
-                onModeChange={setWidgetMode}
-              />
-              </section>
-            )}
-            {showInfoCollections && (
-              <InfoCollections
-                language={settings.language}
-                className={cn(
-                  "col-span-1",
-                  "md:col-span-12",
-                )}
-                onHide={() =>
-                  hideHomeWidget(
-                    "showInfoCollections",
-                    "home.widgetShort.infoCollections",
-                  )
-                }
-                hideLabel={t("home.hideWidget")}
-                hideTooltip={t(
-                  "home.hideWidgetTooltip",
-                  t("home.widgetShort.infoCollections"),
-                )}
-              />
-            )}
           </div>
         )}
 

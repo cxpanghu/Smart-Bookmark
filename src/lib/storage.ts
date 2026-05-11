@@ -21,12 +21,6 @@ export const DEFAULT_SETTINGS: Settings = {
   customEngines: [],
   expandedFolders: [],
   pinnedFolderIds: [],
-  githubToken: "",
-  discoverDefaultRange: "weekly",
-  discoverDefaultMode: "created",
-  discoverDefaultLanguage: "",
-  showGithubTrendingWidget: true,
-  showInfoCollections: true,
   showTopSites: true,
 };
 

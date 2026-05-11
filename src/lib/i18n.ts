@@ -47,95 +47,16 @@ const zh: Dict = {
     `匹配 ${n} 个书签 · Enter 走搜索引擎`,
   "dash.matchNone": "无书签匹配 · Enter 走搜索引擎",
 
-  "discover.title": "GitHub 热门",
-  "discover.subtitle":
-    "基于 GitHub Search：选择「新创建」或「最热门」模式，再按日 / 周 / 月 / 年 设定时间窗口，按创建以来 star 均速排序。",
-  "discover.mode.created": "新创建",
-  "discover.mode.hottest": "最热门",
-  "discover.mode.created.hint": "时间窗内新建的仓库，按创建以来 star 均速排序",
-  "discover.mode.hottest.hint": "时间窗内活跃的仓库，按创建以来 star 均速排序",
-  "discover.widget.hint": (range: string, days: string) =>
-    `已选「${range}」：近 ${days} 天时间窗。`,
-  "discover.range.daily": "今日",
-  "discover.range.weekly": "本周",
-  "discover.range.monthly": "本月",
-  "discover.range.yearly": "本年",
-  "discover.language.all": "全部语言",
-  "discover.refresh": "刷新",
-  "discover.loading": "正在拉取热门项目…",
-  "discover.empty": "暂无结果，换个条件或稍后再试。",
-  "discover.error": "拉取失败",
-  "discover.stars": (n: string) => `${n} Stars`,
-  "discover.forks": (n: string) => `${n} Forks`,
-  "discover.addBookmark": "加到书签",
-  "discover.addedBookmark": "已加到书签",
-  "discover.copy": "复制链接",
-  "discover.open": "打开",
-  "discover.more": "查看全部",
-  "discover.widget.title": "GitHub 热门",
-  "discover.widget.viewAll": "查看全部 →",
-  "discover.injectAi": "注入当前 trending",
-  "discover.injectedAi": (n: string) => `已把 ${n} 条热门项目注入 AI 会话。`,
-  "discover.updated": (t: string) => `更新于 ${t}`,
-  "discover.needToken": "未配置 GitHub Token，未认证请求 60 次/小时。前往设置填入。",
-  "discover.cacheHit": "来自缓存",
-  "discover.rank.hint": (n: string) => `当前排序第 ${n} 位`,
-  "discover.velocity": (n: string) => `均 ${n} ★/天`,
-  "discover.velocity.hint":
-    "创建以来平均每天获得的 stars，不是所选时间窗内的真实新增。",
-  "discover.recentVelocity": (n: string) => `近期 ${n} ★/天`,
-  "discover.recentVelocity.hint":
-    "基于本地两次刷新之间的真实增量计算的近期速度。",
-  "discover.recentVelocity.pending":
-    "再刷新一次后才能拿到真实的近期增长速度，当前显示的是创建以来均速。",
-  "discover.totalStars.hint": "按总 star 排序：直观的「现在大家用得最多」",
-  "discover.gained.hint": (n: string, period: string) =>
-    `距上次刷新 ${period}，新增 ${n} stars。`,
-  "discover.sort.title": "排序",
-  "discover.sort.auto": "自动",
-  "discover.sort.auto.hint":
-    "新建模式 → 创建以来均速；最热门模式 → 总 star",
-  "discover.sort.velocity-since-creation": "创建以来",
-  "discover.sort.velocity-since-creation.hint":
-    "按 stars / 仓库年龄 排序。适合「新建」模式。",
-  "discover.sort.recent-growth": "近期增长",
-  "discover.sort.recent-growth.hint":
-    "按本地两次刷新之间的真实 ★/天 排序。需先积累快照。",
-  "discover.sort.total-stars": "总 star",
-  "discover.sort.total-stars.hint": "按总 star 数降序。最直观的「现在最热」。",
-  "discover.sort.recentMissing":
-    "本地还没有该排序所需的快照，刷新一次后下次再来此排序就生效了。",
-  "settings.discover": "发现 / GitHub 热门",
-  "settings.githubToken": "GitHub Personal Access Token",
-  "settings.githubTokenHint":
-    "可选。只需 public_repo 权限即可。填写后 API 限额从 60/h 提升到 5000/h。",
-  "settings.discoverDefaults": "默认时段 / 语言",
-  "settings.discoverSort": "默认排序",
-  "settings.discoverSortHint":
-    "「自动」会根据当前模式选合适口径：新建 → 创建以来均速；最热门 → 总 star。「近期增长」需要至少积累一次刷新快照。",
   "settings.homeWidgets": "首页组件",
-  "settings.showGithubTrendingWidget": "首页显示 GitHub 热门",
-  "settings.showGithubTrendingWidgetHint":
-    "关闭后首页不再显示 GitHub 热门；发现页仍可正常使用。",
-  "settings.showInfoCollections": "首页显示信息差雷达",
-  "settings.showInfoCollectionsHint":
-    "关闭后首页不再显示 NewsNow 内嵌热点和资源入口面板。",
   "settings.showTopSites": "首页显示「常去」",
   "settings.showTopSitesHint":
     "关闭后首页不再显示由 Chrome 自动统计的常访问站点小组件。",
-  "settings.homeWidgetsHint":
-    "勾选要在首页显示的组件。首页组件 header 也可鼠标悬停后点「隐藏」快捷关闭。",
-  "home.widgetShort.githubTrending": "GitHub 热门",
-  "home.widgetShort.infoCollections": "信息差雷达",
   "home.widgetShort.topSites": "常去",
   "home.hideWidget": "隐藏",
   "home.hideWidgetTooltip": (name: string) =>
     `隐藏「${name}」组件（可在设置 → 首页组件中恢复）`,
   "home.widgetHidden": (name: string) =>
     `已隐藏「${name}」，可在设置 → 首页组件中恢复`,
-  "settings.githubTokenSave": "保存",
-  "settings.githubTokenClear": "清空",
-  "settings.githubTokenCreate": "创建 Token",
 
   "cleaner.profile": "书签画像",
   "cleaner.total": "书签总数",
@@ -306,98 +227,16 @@ const en: Dict = {
     `${n} bookmark matches · Enter to search the web`,
   "dash.matchNone": "No bookmark matches · Enter to search the web",
 
-  "discover.title": "GitHub Trending",
-  "discover.subtitle":
-    "Uses GitHub Search: choose \"Newly Created\" or \"Hottest\" mode, pick a time window, then sort by average stars per day since creation.",
-  "discover.mode.created": "Newly Created",
-  "discover.mode.hottest": "Hottest",
-  "discover.mode.created.hint": "Repos created within the time window, sorted by average stars per day since creation",
-  "discover.mode.hottest.hint": "Active repos within the time window, sorted by average stars per day since creation",
-  "discover.widget.hint": (range: string, days: string) =>
-    `「${range}」: last ${days} days window.`,
-  "discover.range.daily": "Today",
-  "discover.range.weekly": "This week",
-  "discover.range.monthly": "This month",
-  "discover.range.yearly": "This year",
-  "discover.language.all": "All languages",
-  "discover.refresh": "Refresh",
-  "discover.loading": "Loading trending repos…",
-  "discover.empty": "No results. Try different filters.",
-  "discover.error": "Failed to load",
-  "discover.stars": (n: string) => `${n} Stars`,
-  "discover.forks": (n: string) => `${n} Forks`,
-  "discover.addBookmark": "Bookmark",
-  "discover.addedBookmark": "Bookmarked",
-  "discover.copy": "Copy link",
-  "discover.open": "Open",
-  "discover.more": "View all",
-  "discover.widget.title": "GitHub Trending",
-  "discover.widget.viewAll": "View all →",
-  "discover.injectAi": "Inject current trending",
-  "discover.injectedAi": (n: string) =>
-    `Injected ${n} trending repos into AI chat.`,
-  "discover.updated": (t: string) => `Updated ${t}`,
-  "discover.needToken":
-    "No GitHub Token set. Unauthenticated: 60 req/h. Open Settings to add one.",
-  "discover.cacheHit": "From cache",
-  "discover.rank.hint": (n: string) => `Current rank #${n}`,
-  "discover.velocity": (n: string) => `avg ${n} ★/day`,
-  "discover.velocity.hint":
-    "Average stars gained per day since the repo was created, not the actual gain inside the selected window.",
-  "discover.recentVelocity": (n: string) => `recent ${n} ★/day`,
-  "discover.recentVelocity.hint":
-    "Real growth velocity computed from the delta between two local refreshes.",
-  "discover.recentVelocity.pending":
-    "Refresh once more to capture real recent growth — falling back to all-time average for now.",
-  "discover.totalStars.hint": "Sorted by total stars: the simplest \"what's everyone using\".",
-  "discover.gained.hint": (n: string, period: string) =>
-    `+${n} stars since last refresh (${period} ago).`,
-  "discover.sort.title": "Sort",
-  "discover.sort.auto": "Auto",
-  "discover.sort.auto.hint":
-    "Newly Created → since creation; Hottest → total stars",
-  "discover.sort.velocity-since-creation": "Since creation",
-  "discover.sort.velocity-since-creation.hint":
-    "Sort by stars / repo age. Best for \"Newly Created\" mode.",
-  "discover.sort.recent-growth": "Recent growth",
-  "discover.sort.recent-growth.hint":
-    "Sort by ★/day between the last two local refreshes. Needs snapshots first.",
-  "discover.sort.total-stars": "Total stars",
-  "discover.sort.total-stars.hint":
-    "Sort by total star count desc — the simplest \"hot right now\".",
-  "discover.sort.recentMissing":
-    "No snapshots locally yet — refresh once and this sort will activate next time.",
-  "settings.discover": "Discover / GitHub Trending",
-  "settings.githubToken": "GitHub Personal Access Token",
-  "settings.githubTokenHint":
-    "Optional. Needs only public_repo scope. Raises API quota from 60/h to 5000/h.",
-  "settings.discoverDefaults": "Default range / language",
-  "settings.discoverSort": "Default sort",
-  "settings.discoverSortHint":
-    "\"Auto\" picks for you: Newly Created → since-creation; Hottest → total stars. \"Recent growth\" needs at least one refresh to gather snapshots.",
   "settings.homeWidgets": "Home widgets",
-  "settings.showGithubTrendingWidget": "Show GitHub Trending on home",
-  "settings.showGithubTrendingWidgetHint":
-    "When off, the dashboard hides GitHub Trending. The Discover page still works.",
-  "settings.showInfoCollections": "Show signal radar on home",
-  "settings.showInfoCollectionsHint":
-    "When off, the dashboard hides the embedded NewsNow live feed and resource link panels.",
   "settings.showTopSites": "Show \"Frequent\" on home",
   "settings.showTopSitesHint":
     "When off, the dashboard hides the Chrome top sites widget.",
-  "settings.homeWidgetsHint":
-    "Pick the widgets to show on the dashboard. You can also hover any widget header on home and click \"Hide\" to remove it from there.",
-  "home.widgetShort.githubTrending": "GitHub Trending",
-  "home.widgetShort.infoCollections": "Signal radar",
   "home.widgetShort.topSites": "Frequent",
   "home.hideWidget": "Hide",
   "home.hideWidgetTooltip": (name: string) =>
     `Hide \"${name}\" (restore in Settings → Home widgets)`,
   "home.widgetHidden": (name: string) =>
     `Hid \"${name}\". Restore in Settings → Home widgets.`,
-  "settings.githubTokenSave": "Save",
-  "settings.githubTokenClear": "Clear",
-  "settings.githubTokenCreate": "Create token",
 
   "cleaner.profile": "Profile",
   "cleaner.total": "Bookmarks",
