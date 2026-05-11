@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -126,8 +125,6 @@ export default function Dashboard({
   const [widgetMode, setWidgetMode] = useState<TrendingMode>(
     settings.discoverDefaultMode ?? "created",
   );
-  const trendingSectionRef = useRef<HTMLElement>(null);
-  const [trendingHeight, setTrendingHeight] = useState<number | null>(null);
   const [pageSize, setPageSize] = useState<number>(() => {
     const raw = localStorage.getItem("sb_pageSize");
     if (raw === "Infinity") return Infinity;
@@ -179,19 +176,6 @@ export default function Dashboard({
         (sites || []).slice(0, 10).map((s) => ({ url: s.url, title: s.title })),
       );
     });
-  }, []);
-
-  useLayoutEffect(() => {
-    const el = trendingSectionRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver((entries) => {
-      for (const e of entries) {
-        const h = Math.round(e.contentRect.height);
-        if (h > 0) setTrendingHeight(h);
-      }
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
   }, []);
 
   useEffect(() => {
@@ -856,15 +840,8 @@ export default function Dashboard({
         {showHero && (
           <div className="grid grid-cols-1 items-stretch gap-5 pt-2 md:grid-cols-12">
             {hasTopSitesSection && (
-              <aside className="hidden md:col-span-3 md:block">
-                <Card
-                  className="group/widget relative flex h-full flex-col p-3"
-                  style={
-                    showGithubTrendingWidget && trendingHeight
-                      ? { maxHeight: trendingHeight + "px" }
-                      : undefined
-                  }
-                >
+              <section className="group/widget col-span-1 hidden md:block md:col-span-12">
+                <Card className="relative overflow-hidden p-4 md:p-5">
                   <div className="mb-1 flex shrink-0 items-center gap-2 px-1">
                     <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-sky-500/20 to-indigo-500/20 text-sky-600 dark:text-sky-400">
                       <Clock className="h-3.5 w-3.5" />
@@ -897,51 +874,55 @@ export default function Dashboard({
                   <p className="mb-2 shrink-0 px-1 text-[10.5px] leading-relaxed text-muted-foreground/70">
                     浏览器按访问频率自动更新
                   </p>
-                  <div className="min-h-0 flex-1 overflow-y-auto pr-1 scrollbar-thin">
-                    <div className="divide-y divide-border/60">
-                      {topSites.map((s) => (
+                  <div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+                      {topSites.map((s, index) => (
                         <a
                           key={s.url}
                           href={s.url}
                           target="_blank"
                           rel="noreferrer"
                           title={s.url}
-                          className="group flex items-center gap-2.5 rounded-md px-2 py-2 transition hover:bg-accent/70"
+                          className="group/site grid min-h-[108px] grid-cols-[44px_minmax(0,1fr)_auto] items-start gap-3 rounded-xl border border-border/70 bg-background/70 p-3.5 transition hover:border-primary/30 hover:bg-accent/55 hover:shadow-sm"
                         >
-                          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-background shadow-[0_1px_0_rgba(15,23,42,0.03)] ring-1 ring-border/80">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-card shadow-[0_1px_0_rgba(15,23,42,0.03)] ring-1 ring-border/80 transition group-hover/site:ring-primary/25">
                             <img
-                              src={faviconOf(s.url, 32)}
+                              src={faviconOf(s.url, 64)}
                               alt=""
-                              className="h-4 w-4 rounded"
+                              className="h-6 w-6 rounded"
                               onError={(e) =>
                                 (e.currentTarget.style.visibility = "hidden")
                               }
                             />
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-medium text-foreground">
-                              {s.title || hostnameOf(s.url)}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
+                                #{index + 1}
+                              </span>
+                              <span className="truncate text-base font-semibold tracking-tight text-foreground">
+                                {s.title || hostnameOf(s.url)}
+                              </span>
                             </div>
-                            <div className="truncate text-[11px] text-muted-foreground">
+                            <div className="mt-1 truncate text-sm font-medium text-muted-foreground">
                               {hostnameOf(s.url)}
                             </div>
+                            <div className="mt-2 line-clamp-2 break-all text-[11.5px] leading-relaxed text-muted-foreground/80">
+                              {s.url}
+                            </div>
                           </div>
+                          <ExternalLink className="mt-1 h-4 w-4 text-muted-foreground opacity-50 transition group-hover/site:translate-x-0.5 group-hover/site:-translate-y-0.5 group-hover/site:text-primary group-hover/site:opacity-100" />
                         </a>
                       ))}
-                    </div>
                   </div>
                 </Card>
-              </aside>
+              </section>
             )}
 
             {showGithubTrendingWidget && (
               <section
-                ref={trendingSectionRef}
                 className={cn(
                   "group/widget col-span-1",
-                  hasTopSitesSection
-                    ? "md:col-span-9"
-                    : "md:col-span-12",
+                  "md:col-span-12",
                 )}
               >
               <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -1067,11 +1048,7 @@ export default function Dashboard({
                 language={settings.language}
                 className={cn(
                   "col-span-1",
-                  showGithubTrendingWidget
-                    ? "md:col-span-12"
-                    : hasTopSitesSection
-                      ? "md:col-span-9"
-                      : "md:col-span-12",
+                  "md:col-span-12",
                 )}
                 onHide={() =>
                   hideHomeWidget(
