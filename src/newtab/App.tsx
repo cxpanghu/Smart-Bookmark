@@ -7,7 +7,7 @@ import {
   Settings2,
   Columns,
   HardDriveDownload,
-  Flame,
+  Radio,
 } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Cleaner from "./pages/Cleaner";
@@ -15,7 +15,7 @@ import AiPanel from "./pages/AiPanel";
 import SettingsPage from "./pages/Settings";
 import Compare from "./pages/Compare";
 import BackupPage from "./pages/Backup";
-import Discover from "./pages/Discover";
+import InfoRadar from "./pages/InfoRadar";
 import QrDialog from "./pages/QrDialog";
 import { getSettings, onSettingsChange } from "@/lib/storage";
 import type { Settings } from "@/types";
@@ -117,7 +117,7 @@ export default function App() {
                 {(
                   [
                     ["dashboard", Bookmark, t("tabs.dashboard")],
-                    ["discover", Flame, t("tabs.discover")],
+                    ["discover", Radio, t("tabs.discover")],
                     ["cleaner", Wand2, t("tabs.cleaner")],
                     ["compare", Columns, t("tabs.compare")],
                     ["ai", Sparkles, t("tabs.ai")],
@@ -146,7 +146,7 @@ export default function App() {
               onOpenDiscover={() => setTabWithHash("discover")}
             />
           )}
-          {tab === "discover" && <Discover settings={settings} />}
+          {tab === "discover" && <InfoRadar settings={settings} />}
           {tab === "cleaner" && <Cleaner />}
           {tab === "compare" && <Compare settings={settings} />}
           {tab === "ai" && <AiPanel settings={settings} />}

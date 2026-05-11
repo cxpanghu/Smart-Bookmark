@@ -1,6 +1,7 @@
 node_modules
 dist.zip
 .vite
+*.tsbuildinfo
 *.log
 .DS_Store
 .env

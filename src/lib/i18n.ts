@@ -15,7 +15,7 @@ const zh: Dict = {
   "tabs.compare": "对比搜索",
   "tabs.backup": "备份",
   "tabs.settings": "设置",
-  "tabs.discover": "发现",
+  "tabs.discover": "信息差",
 
   "common.search": "搜索",
   "common.cancel": "取消",
@@ -273,7 +273,7 @@ const en: Dict = {
   "tabs.compare": "Compare",
   "tabs.backup": "Backup",
   "tabs.settings": "Settings",
-  "tabs.discover": "Discover",
+  "tabs.discover": "Radar",
 
   "common.search": "Search",
   "common.cancel": "Cancel",
