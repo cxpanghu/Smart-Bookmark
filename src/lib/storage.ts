@@ -22,6 +22,7 @@ export const DEFAULT_SETTINGS: Settings = {
   expandedFolders: [],
   pinnedFolderIds: [],
   showTopSites: true,
+  weatherLocation: undefined,
 };
 
 const hasChromeStorage = typeof chrome !== "undefined" && !!chrome.storage?.local;

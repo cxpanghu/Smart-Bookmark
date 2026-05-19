@@ -47,6 +47,7 @@ import { faviconFor, findEngine } from "@/lib/engines";
 import HideWidgetButton from "@/components/HideWidgetButton";
 import { Tooltip } from "@/components/ui/tooltip";
 import { rankSearchItems } from "@/lib/searchRank";
+import WeatherCard from "@/components/WeatherCard";
 
 interface Props {
   settings: Settings;
@@ -675,6 +676,7 @@ export default function Dashboard({
             onTogglePin={onTogglePin}
           />
         </Card>
+        <WeatherCard location={settings.weatherLocation} />
       </aside>
 
       <section className="min-w-0 space-y-5">

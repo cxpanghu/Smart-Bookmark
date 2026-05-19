@@ -87,6 +87,17 @@ export interface CustomEngine {
   icon?: string;
 }
 
+export interface WeatherLocation {
+  id: number;
+  name: string;
+  country: string;
+  admin1?: string;
+  admin2?: string;
+  timezone: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface Settings {
   theme: "system" | "light" | "dark";
   accentPreset: AccentPreset;
@@ -110,6 +121,7 @@ export interface Settings {
   pinnedFolderIds: string[];
   /** 首页是否显示「常去」（Chrome topSites）小组件 */
   showTopSites?: boolean;
+  weatherLocation?: WeatherLocation;
 }
 
 
