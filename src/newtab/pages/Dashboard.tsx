@@ -11,6 +11,7 @@ import {
   flatten,
   findFolder,
   moveBookmark,
+  removeBookmark,
 } from "@/lib/bookmarks";
 import type { BookmarkNode, FlatBookmark, Settings } from "@/types";
 import { Card } from "@/components/ui/card";
@@ -33,6 +34,7 @@ import {
   Clock,
   HardDriveDownload,
   Settings2,
+  Trash2,
   Wand2,
 } from "lucide-react";
 import { setSettings } from "@/lib/storage";
@@ -90,6 +92,17 @@ interface SearchCommandItem {
   iconUrl?: string;
   Icon?: React.ComponentType<{ className?: string }>;
   onRun: () => void;
+}
+
+function newestFirst(bookmarks: FlatBookmark[]): FlatBookmark[] {
+  return bookmarks
+    .map((bookmark, index) => ({ bookmark, index }))
+    .sort(
+      (a, b) =>
+        (b.bookmark.dateAdded ?? 0) - (a.bookmark.dateAdded ?? 0) ||
+        a.index - b.index,
+    )
+    .map(({ bookmark }) => bookmark);
 }
 
 export default function Dashboard({
@@ -187,7 +200,7 @@ export default function Dashboard({
       setItems(all.map((b, i) => ({ ...b, index: i })));
       setBreadcrumb(buildBreadcrumb(tree, folder.id));
     } else {
-      const flat = flatten(tree);
+      const flat = newestFirst(flatten(tree));
       setItems(flat.map((b, i) => ({ ...b, index: i })));
       setSubFolders([]);
       setBreadcrumb([]);
@@ -347,6 +360,23 @@ export default function Dashboard({
   };
 
   const closeCtx = useCallback(() => setCtxMenu(null), []);
+
+  const deleteBookmarkFromMenu = useCallback(async () => {
+    if (!ctxMenu) return;
+    if (!confirm(`确定删除书签「${ctxMenu.title || ctxMenu.url}」吗？`)) return;
+    const bookmark = ctxMenu;
+    setCtxMenu(null);
+    try {
+      await removeBookmark(bookmark.id);
+      toast("书签已删除", "success");
+      await reload();
+    } catch (err) {
+      console.warn("delete bookmark failed", err);
+      toast("删除失败", "error");
+      await reload();
+    }
+  }, [ctxMenu, reload]);
+
   useEffect(() => {
     if (!ctxMenu) return;
     const fn = () => closeCtx();
@@ -1108,6 +1138,7 @@ export default function Dashboard({
             setQrUrl(ctxMenu.url);
             setCtxMenu(null);
           }}
+          onDelete={deleteBookmarkFromMenu}
           onClose={() => setCtxMenu(null)}
         />
       )}
@@ -1507,6 +1538,7 @@ function BookmarkCtxMenu({
   anchor,
   onCopy,
   onQr,
+  onDelete,
   onClose,
 }: {
   id: string;
@@ -1515,6 +1547,7 @@ function BookmarkCtxMenu({
   anchor: MenuAnchor;
   onCopy: () => void;
   onQr: () => void;
+  onDelete: () => void;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -1567,6 +1600,13 @@ function BookmarkCtxMenu({
         onClick={onQr}
       >
         生成二维码
+      </button>
+      <button
+        className="flex w-full items-center gap-2 rounded px-3 py-1.5 text-left text-destructive hover:bg-destructive/10"
+        onClick={onDelete}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+        删除书签
       </button>
     </div>,
     document.body,
