@@ -1,16 +1,15 @@
 import type { BookmarkNode, CleanIssue, FlatBookmark } from "@/types";
 import { flatten, allFolders, countBookmarks, getTree } from "@/lib/bookmarks";
 import { normalizeUrl } from "@/lib/utils";
+import { t } from "@/lib/i18n";
 
 export interface ScanProgress {
   total: number;
   checked: number;
-  phase: "structure" | "duplicates" | "invalid" | "done";
+  phase: "structure" | "duplicates" | "done";
 }
 
 export interface ScanOptions {
-  checkInvalid: boolean;
-  concurrency: number;
   signal?: AbortSignal;
   onProgress?: (p: ScanProgress) => void;
 }
@@ -18,11 +17,7 @@ export interface ScanOptions {
 export async function scanAll(
   opts: Partial<ScanOptions> = {},
 ): Promise<CleanIssue[]> {
-  const options: ScanOptions = {
-    checkInvalid: true,
-    concurrency: 8,
-    ...opts,
-  };
+  const options: ScanOptions = { ...opts };
   const tree = await getTree();
   const flat = flatten(tree);
 
@@ -35,10 +30,6 @@ export async function scanAll(
 
   issues.push(...scanBrokenUrls(flat));
 
-  if (options.checkInvalid) {
-    const liveness = await scanInvalid(flat, options);
-    issues.push(...liveness);
-  }
   options.onProgress?.({ total: flat.length, checked: flat.length, phase: "done" });
   return issues;
 }
@@ -50,7 +41,7 @@ export function scanEmptyFolders(tree: BookmarkNode[]): CleanIssue[] {
     .map((f) => ({
       id: `empty-${f.id}`,
       kind: "empty-folder" as const,
-      title: `空文件夹：${f.title || "(未命名)"}`,
+      title: t("cleaner.issue.emptyFolder", f.title || t("dash.untitled")),
       detail: f.path,
       folderId: f.id,
     }));
@@ -66,13 +57,24 @@ export function scanDuplicates(flat: FlatBookmark[]): CleanIssue[] {
   const out: CleanIssue[] = [];
   for (const [key, list] of groups) {
     if (list.length < 2) continue;
+    // 整组都进结果（含首项），「保留最新/最早」才能覆盖完整重复组；
+    // 首项默认不勾选，保持「默认保留一条」的清理行为。
     const [keep, ...rest] = list;
+    out.push({
+      id: `dup-${keep.id}`,
+      kind: "duplicate",
+      title: keep.title,
+      detail: t("cleaner.issue.duplicateFirst", String(list.length)),
+      bookmark: keep,
+      group: key,
+      defaultSelected: false,
+    });
     for (const dup of rest) {
       out.push({
         id: `dup-${dup.id}`,
         kind: "duplicate",
         title: dup.title,
-        detail: `与「${keep.title}」重复（${keep.path}）`,
+        detail: t("cleaner.issue.duplicateOf", keep.title, keep.path),
         bookmark: dup,
         group: key,
       });
@@ -81,89 +83,42 @@ export function scanDuplicates(flat: FlatBookmark[]): CleanIssue[] {
   return out;
 }
 
+const COMMON_PROTOCOLS = new Set([
+  "http:",
+  "https:",
+  "chrome:",
+  "edge:",
+  "file:",
+  "about:",
+]);
+
 export function scanBrokenUrls(flat: FlatBookmark[]): CleanIssue[] {
   const out: CleanIssue[] = [];
   for (const b of flat) {
     try {
       const u = new URL(b.url);
-      if (!/^https?:|^chrome:|^edge:|^file:|^about:/.test(u.protocol + ":")) {
-        if (!["http:", "https:"].includes(u.protocol)) {
-          out.push({
-            id: `broken-${b.id}`,
-            kind: "broken-url",
-            title: b.title,
-            detail: `不常见协议：${u.protocol}`,
-            bookmark: b,
-          });
-        }
+      if (!COMMON_PROTOCOLS.has(u.protocol)) {
+        // javascript:（bookmarklet）、mailto: 等属于合法书签，仅提示、默认不勾选。
+        out.push({
+          id: `broken-${b.id}`,
+          kind: "broken-url",
+          title: b.title,
+          detail: t("cleaner.issue.unusualProtocol", u.protocol),
+          bookmark: b,
+          defaultSelected: false,
+        });
       }
     } catch {
       out.push({
         id: `broken-${b.id}`,
         kind: "broken-url",
         title: b.title,
-        detail: `URL 无法解析：${b.url}`,
+        detail: t("cleaner.issue.invalidUrl", b.url),
         bookmark: b,
       });
     }
   }
   return out;
-}
-
-export async function scanInvalid(
-  flat: FlatBookmark[],
-  options: ScanOptions,
-): Promise<CleanIssue[]> {
-  const targets = flat.filter((b) => /^https?:/.test(b.url));
-  const total = targets.length;
-  let checked = 0;
-  const out: CleanIssue[] = [];
-
-  const queue = [...targets];
-  const workers = Array.from({ length: options.concurrency }, async () => {
-    while (queue.length) {
-      if (options.signal?.aborted) return;
-      const b = queue.shift()!;
-      const alive = await pingAlive(b.url, options.signal);
-      checked++;
-      options.onProgress?.({ total, checked, phase: "invalid" });
-      if (!alive) {
-        out.push({
-          id: `invalid-${b.id}`,
-          kind: "invalid",
-          title: b.title,
-          detail: `无法访问：${b.url}`,
-          bookmark: b,
-        });
-      }
-    }
-  });
-  await Promise.all(workers);
-  return out;
-}
-
-async function pingAlive(url: string, signal?: AbortSignal): Promise<boolean> {
-  const ctrl = new AbortController();
-  const timeout = setTimeout(() => ctrl.abort(), 6000);
-  signal?.addEventListener("abort", () => ctrl.abort(), { once: true });
-  try {
-    const res = await fetch(url, {
-      method: "HEAD",
-      mode: "no-cors",
-      redirect: "follow",
-      signal: ctrl.signal,
-    });
-    return res.ok || res.type === "opaque";
-  } catch {
-    try {
-      const res = await fetch(url, { method: "GET", mode: "no-cors", signal: ctrl.signal });
-      return res.type === "opaque" || res.ok;
-    } catch {
-      return false;
-    }
-  } finally {
-    clearTimeout(timeout);
-  }
 }
 
 export interface Profile {
@@ -184,8 +139,7 @@ export interface Profile {
   monthBuckets: Array<{ label: string; count: number }>;
   topKeywords: Array<{ word: string; count: number }>;
   busiestDay?: { date: string; count: number };
-  level: { index: number; label: string };
-  badges: Array<{ id: string; label: string; detail: string }>;
+  badges: Array<{ id: string; detailValue?: string }>;
   avgPerFolder: number;
   orgScore: number;
 }
@@ -269,34 +223,29 @@ export async function buildProfile(): Promise<Profile> {
   >(
     (acc, f) =>
       !acc || f.count > acc.count
-        ? { title: f.title || "(未命名)", count: f.count }
+        ? { title: f.title || t("dash.untitled"), count: f.count }
         : acc,
     undefined,
   );
 
   const normalizedMap = new Map<string, number>();
   for (const b of flat) {
-    try {
-      const u = new URL(b.url);
-      u.hash = "";
-      u.search = "";
-      const k = u.toString().toLowerCase();
-      normalizedMap.set(k, (normalizedMap.get(k) ?? 0) + 1);
-    } catch {}
+    const key = normalizeUrl(b.url);
+    normalizedMap.set(key, (normalizedMap.get(key) ?? 0) + 1);
   }
   let duplicateUrls = 0;
   for (const c of normalizedMap.values()) if (c > 1) duplicateUrls++;
 
   const keywordMap = new Map<string, number>();
   const stopwords = new Set([
-    "的",
-    "是",
-    "在",
-    "和",
-    "了",
-    "与",
-    "或",
-    "及",
+    "\u7684",
+    "\u662f",
+    "\u5728",
+    "\u548c",
+    "\u4e86",
+    "\u4e0e",
+    "\u6216",
+    "\u53ca",
     "the",
     "a",
     "an",
@@ -311,12 +260,31 @@ export async function buildProfile(): Promise<Profile> {
     "is",
     "are",
     "was",
+    "do",
+    "com",
+    "net",
+    "org",
+    "www",
+    "\u9996\u9875",
+    "\u8bba\u575b",
+    "\u7f51\u7ad9",
+    "\u8d44\u6e90",
+    "\u5206\u4eab",
+    "\u5728\u7ebf",
   ]);
   for (const b of flat) {
     const text = (b.title || "").toLowerCase();
     const tokens = text
       .split(/[\s,，。·\-—_|\/()\[\]「」【】《》:：]+/)
-      .filter((w) => w.length >= 2 && !stopwords.has(w));
+      .filter(
+        (w) =>
+          w.length >= 2 &&
+          !stopwords.has(w) &&
+          !/^\d+$/.test(w) &&
+          !/^lv\d+$/i.test(w) &&
+          !/^(com|net|org|io|cn|cc|tv)$/i.test(w) &&
+          !/^https?$/i.test(w),
+      );
     for (const w of tokens) {
       keywordMap.set(w, (keywordMap.get(w) ?? 0) + 1);
     }
@@ -326,7 +294,6 @@ export async function buildProfile(): Promise<Profile> {
     .slice(0, 10)
     .map(([word, count]) => ({ word, count }));
 
-  const level = calcLevel(flat.length);
   const badges = makeBadges({
     total: flat.length,
     topDomains,
@@ -368,29 +335,10 @@ export async function buildProfile(): Promise<Profile> {
     monthBuckets,
     topKeywords,
     busiestDay,
-    level,
     badges,
     avgPerFolder,
     orgScore,
   };
-}
-
-function calcLevel(total: number): { index: number; label: string } {
-  const tiers = [
-    { min: 0, label: "Lv.1 新手收藏家" },
-    { min: 50, label: "Lv.2 练习生" },
-    { min: 200, label: "Lv.3 业余选手" },
-    { min: 500, label: "Lv.4 资深玩家" },
-    { min: 1000, label: "Lv.5 高级收藏家" },
-    { min: 1500, label: "Lv.6 资深分享家" },
-    { min: 2500, label: "Lv.7 专家收藏家" },
-    { min: 4000, label: "Lv.8 书签大师" },
-    { min: 7000, label: "Lv.9 互联网图书馆员" },
-    { min: 12000, label: "Lv.10 传奇收藏家" },
-  ];
-  let idx = 0;
-  for (let i = 0; i < tiers.length; i++) if (total >= tiers[i].min) idx = i;
-  return { index: idx + 1, label: tiers[idx].label };
 }
 
 interface BadgeInput {
@@ -413,38 +361,32 @@ function makeBadges(x: BadgeInput): Profile["badges"] {
   if (hasDomain("github") || hasKw("github", "api", "code", "dev"))
     out.push({
       id: "tech",
-      label: "技术达人",
-      detail: "GitHub / API / 开发资料占比高",
     });
-  if (hasDomain("youtube") || hasDomain("bilibili") || hasKw("课程", "教程"))
+  if (
+    hasDomain("youtube") ||
+    hasDomain("bilibili") ||
+    hasKw("\u8bfe\u7a0b", "\u6559\u7a0b")
+  )
     out.push({
       id: "learn",
-      label: "终身学习",
-      detail: "视频/课程/教程积累",
     });
-  if (hasKw("tool", "工具", "生成器", "convert"))
+  if (hasKw("tool", "\u5de5\u5177", "\u751f\u6210\u5668", "convert"))
     out.push({
       id: "tool",
-      label: "工具控",
-      detail: "工具类关键词丰富",
     });
   if (x.uniqueDomains >= 150 && x.total >= 500)
     out.push({
       id: "wide",
-      label: "博学广闻",
-      detail: `${x.uniqueDomains} 个不同域名`,
+      detailValue: String(x.uniqueDomains),
     });
   if (x.addedThisMonth >= 50)
     out.push({
       id: "active",
-      label: "收藏狂魔",
-      detail: `近 30 天收藏 ${x.addedThisMonth} 条`,
+      detailValue: String(x.addedThisMonth),
     });
   if (x.folders >= 20 && x.emptyFolders / Math.max(1, x.folders) < 0.1)
     out.push({
       id: "organizer",
-      label: "整理达人",
-      detail: "文件夹多且空闲率低",
     });
   return out;
 }

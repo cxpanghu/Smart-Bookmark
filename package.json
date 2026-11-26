@@ -3,14 +3,15 @@
   "private": true,
   "version": "0.2.0",
   "type": "module",
-  "description": "Smart Bookmark - 书签清理 + 新标签页看板 + AI + 对比搜索 + 悬浮球 + 二维码 + 备份，浏览器扩展（Chrome / Edge，MV3）",
+  "description": "Local-first bookmark management, cleanup, backup, side panel, QR tools, and a responsive new-tab dashboard for Chrome and Edge.",
   "scripts": {
     "dev": "vite",
     "icons": "node scripts/icons.mjs",
-    "build": "node scripts/icons.mjs && tsc -b && vite build && node scripts/postbuild.mjs",
+    "build": "node scripts/icons.mjs && tsc -b && vite build && node scripts/postbuild.mjs && npm run check:secrets",
     "preview": "vite preview",
     "zip": "npm run build && node scripts/zip.mjs",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "check:secrets": "node scripts/check-secrets.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.2",

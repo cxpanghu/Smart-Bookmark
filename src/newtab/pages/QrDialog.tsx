@@ -42,7 +42,7 @@ export default function QrDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md p-5 sm:p-6">
+      <DialogContent className="max-w-sm p-6">
         <DialogHeader>
           <DialogTitle>{t("qr.title")}</DialogTitle>
           <DialogDescription
@@ -53,27 +53,27 @@ export default function QrDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex justify-center py-1">
-          <div className="rounded-xl border border-border bg-white p-3 shadow-sm dark:bg-[hsl(var(--card))]">
+        <div className="flex justify-center py-2">
+          <div className="rounded-2xl border border-border/80 bg-white p-3.5 shadow-sm dark:bg-card">
             {img ? (
               <img
                 src={img}
                 alt="QR"
-                className="block h-64 w-64 select-none"
+                className="block h-56 w-56 select-none rounded-lg"
                 draggable={false}
               />
             ) : (
-              <div className="h-64 w-64 animate-pulse rounded bg-muted" />
+              <div className="h-56 w-56 animate-pulse rounded-lg bg-muted" />
             )}
           </div>
         </div>
 
         <div className="flex justify-end gap-2 pt-1">
-          <Button variant="outline" size="sm" className="gap-2" onClick={copyUrl}>
-            <Copy className="h-4 w-4" /> {t("qr.copyUrl")}
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={copyUrl}>
+            <Copy className="h-3.5 w-3.5" /> {t("qr.copyUrl")}
           </Button>
-          <Button size="sm" className="gap-2" onClick={download}>
-            <Download className="h-4 w-4" /> {t("qr.download")}
+          <Button size="sm" className="gap-1.5" onClick={download}>
+            <Download className="h-3.5 w-3.5" /> {t("qr.download")}
           </Button>
         </div>
       </DialogContent>

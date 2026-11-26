@@ -1,3 +1,5 @@
+import { normalizeUrl } from "@/lib/utils";
+
 export interface SearchRankInput {
   id: string;
   title: string;
@@ -90,9 +92,8 @@ function fuzzySpan(query: string, text: string): { span: number } | null {
 
 function normalizeUrlKey(url: string): string {
   try {
-    const u = new URL(url);
-    u.hash = "";
-    return u.toString().toLowerCase();
+    // 与清理器一致：hostname 小写，path/query 保留大小写，避免大小写敏感链接被误合并。
+    return normalizeUrl(url);
   } catch {
     return normalizeText(url);
   }

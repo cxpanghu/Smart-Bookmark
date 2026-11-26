@@ -1,50 +1,46 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Bookmark,
-  Sparkles,
-  Wand2,
-  Settings2,
-  Columns,
-  HardDriveDownload,
-  Radio,
-} from "lucide-react";
+import { Settings2 } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
-import Cleaner from "./pages/Cleaner";
-import AiPanel from "./pages/AiPanel";
-import SettingsPage from "./pages/Settings";
-import Compare from "./pages/Compare";
-import BackupPage from "./pages/Backup";
-import InfoRadar from "./pages/InfoRadar";
+import SettingsPage, { type SettingsSectionId } from "./pages/Settings";
 import QrDialog from "./pages/QrDialog";
+import ThemeToggle from "@/components/ThemeToggle";
 import { getSettings, onSettingsChange } from "@/lib/storage";
 import type { Settings } from "@/types";
 import { useT } from "@/lib/i18n";
 import { ToastHost } from "@/components/ui/toast";
+import { cn } from "@/lib/utils";
 
-type TabId =
-  | "dashboard"
-  | "discover"
-  | "cleaner"
-  | "ai"
-  | "compare"
-  | "backup"
-  | "settings";
+type RouteView =
+  | { mode: "dashboard" }
+  | { mode: "settings"; section: SettingsSectionId };
 
-function readHashTab(): TabId {
+function readHashRoute(): RouteView {
   const h = window.location.hash.slice(1);
   const params = new URLSearchParams(h);
-  const t = params.get("tab");
-  if (
-    t === "cleaner" ||
-    t === "ai" ||
-    t === "settings" ||
-    t === "compare" ||
-    t === "backup" ||
-    t === "discover"
-  )
-    return t;
-  return "dashboard";
+  const tab = params.get("tab");
+  const sectionParam = params.get("section") as SettingsSectionId | null;
+
+  if (tab === "cleaner") {
+    return { mode: "settings", section: "cleaner" };
+  }
+  if (tab === "backup") {
+    return { mode: "settings", section: "backup" };
+  }
+  if (tab === "settings") {
+    const validSections: SettingsSectionId[] = [
+      "general",
+      "search",
+      "widgets",
+      "cleaner",
+      "backup",
+    ];
+    const section =
+      sectionParam && validSections.includes(sectionParam)
+        ? sectionParam
+        : "general";
+    return { mode: "settings", section };
+  }
+  return { mode: "dashboard" };
 }
 
 function readHashParam(key: string): string {
@@ -54,28 +50,42 @@ function readHashParam(key: string): string {
 
 export default function App() {
   const t = useT();
-  const [tab, setTab] = useState<TabId>(readHashTab);
+  const [route, setRoute] = useState<RouteView>(readHashRoute);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [initialQuery] = useState(() => readHashParam("q"));
   const [qr, setQr] = useState<string>(() => readHashParam("qr"));
 
-  /** 切换 Tab 并同步到 hash，避免只改 state 导致地址栏与「查看全部」和 Hash 不同步。 */
-  const setTabWithHash = useCallback((id: TabId) => {
-    setTab(id);
+  const navigateDashboard = useCallback(() => {
+    setRoute({ mode: "dashboard" });
     const p = new URLSearchParams(window.location.hash.slice(1));
-    p.set("tab", id);
+    p.delete("tab");
+    p.delete("section");
     const s = p.toString();
-    const next = s ? "#" + s : "#";
-    if (window.location.hash !== next) {
-      window.location.hash = next;
+    window.history.replaceState(null, "", s ? "#" + s : window.location.pathname);
+  }, []);
+
+  const navigateSettings = useCallback((section: SettingsSectionId = "general") => {
+    setRoute({ mode: "settings", section });
+    const p = new URLSearchParams(window.location.hash.slice(1));
+    if (section === "cleaner") {
+      p.set("tab", "cleaner");
+      p.delete("section");
+    } else if (section === "backup") {
+      p.set("tab", "backup");
+      p.delete("section");
+    } else {
+      p.set("tab", "settings");
+      if (section === "general") p.delete("section");
+      else p.set("section", section);
     }
+    window.location.hash = "#" + p.toString();
   }, []);
 
   useEffect(() => {
     getSettings().then(setSettings);
     const off = onSettingsChange(setSettings);
     const onHash = () => {
-      setTab(readHashTab());
+      setRoute(readHashRoute());
       setQr(readHashParam("qr"));
     };
     window.addEventListener("hashchange", onHash);
@@ -85,74 +95,83 @@ export default function App() {
     };
   }, []);
 
-  const bg = useMemo(() => {
+  const hasWallpaper = Boolean(settings?.wallpaper);
+  const bgStyle = useMemo(() => {
     if (!settings?.wallpaper) return undefined;
-    return { backgroundImage: `url(${settings.wallpaper})` };
+    return { backgroundImage: `url(${JSON.stringify(settings.wallpaper)})` };
   }, [settings?.wallpaper]);
 
   if (!settings) return null;
 
+  const isDashboard = route.mode === "dashboard";
+
   return (
-    <div className="min-h-screen bg-cover bg-center bg-fixed" style={bg}>
-      <div className="min-h-screen bg-background/85 backdrop-blur-sm">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-indigo-500/8 via-fuchsia-500/5 to-transparent" />
-        <header className="sticky top-0 z-20 border-b bg-background/75 backdrop-blur">
-          <div className="mx-auto flex max-w-[1600px] items-center gap-4 px-5 py-3 sm:px-6 2xl:px-8">
-            <div className="flex shrink-0 items-center gap-2 whitespace-nowrap font-semibold">
-              <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-white shadow-md shadow-indigo-500/20">
-                <Bookmark className="h-4 w-4" />
-              </div>
-              <span className="tracking-tight">{t("app.title")}</span>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
-                v0.2
-              </span>
+    <div
+      data-wallpaper={hasWallpaper ? "true" : "false"}
+      className="relative h-screen w-screen overflow-hidden"
+    >
+      {/* 独立壁纸层 + 明暗自适应防护遮罩 */}
+      {hasWallpaper && (
+        <>
+          <div
+            aria-hidden
+            className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
+            style={bgStyle}
+          />
+          <div
+            aria-hidden
+            className="wallpaper-scrim pointer-events-none fixed inset-0 z-0"
+          />
+        </>
+      )}
+
+      <div
+        className={cn(
+          "relative z-10 flex h-full flex-col",
+          !hasWallpaper && "bg-background",
+        )}
+      >
+        {/* 主页右上角隐藏式悬浮触发坞：常态完全隐形，鼠标移至右上角热区平滑浮现 */}
+        {isDashboard && (
+          <div className="group/corner fixed right-0 top-0 z-40 pl-10 pb-8 pr-4 pt-3.5">
+            <div className="bento-surface pointer-events-none flex translate-y-[-4px] items-center gap-1 rounded-full p-1 opacity-0 shadow-lg transition-all duration-200 ease-out group-hover/corner:pointer-events-auto group-hover/corner:translate-y-0 group-hover/corner:opacity-100 focus-within:pointer-events-auto focus-within:translate-y-0 focus-within:opacity-100">
+              <ThemeToggle
+                variant="icon"
+                className="h-7 w-7 rounded-full border-0 bg-transparent shadow-none hover:bg-accent"
+              />
+              <button
+                type="button"
+                onClick={() => navigateSettings("general")}
+                className="inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-foreground/85 transition hover:bg-accent hover:text-foreground"
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+                <span>{t("tabs.settings")}</span>
+              </button>
             </div>
-            <div className="min-w-0 flex-1" />
-            <Tabs value={tab} onValueChange={(v) => setTabWithHash(v as TabId)}>
-              <TabsList className="h-9 gap-0.5 bg-transparent p-0">
-                {(
-                  [
-                    ["dashboard", Bookmark, t("tabs.dashboard")],
-                    ["discover", Radio, t("tabs.discover")],
-                    ["cleaner", Wand2, t("tabs.cleaner")],
-                    ["compare", Columns, t("tabs.compare")],
-                    ["ai", Sparkles, t("tabs.ai")],
-                    ["backup", HardDriveDownload, t("tabs.backup")],
-                    ["settings", Settings2, t("tabs.settings")],
-                  ] as const
-                ).map(([id, Icon, label]) => (
-                  <TabsTrigger
-                    key={id}
-                    value={id}
-                    className="relative h-8 gap-1.5 rounded-md px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none after:pointer-events-none after:absolute after:inset-x-2.5 after:-bottom-[7px] after:h-[2px] after:rounded-full after:bg-primary after:opacity-0 data-[state=active]:after:opacity-100"
-                  >
-                    <Icon className="h-3.5 w-3.5" strokeWidth={1.8} /> {label}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
           </div>
-        </header>
+        )}
 
-        <main className="mx-auto max-w-[1600px] px-5 py-6 sm:px-6 2xl:px-8">
-          {tab === "dashboard" && (
-            <Dashboard
-              settings={settings}
-              initialQuery={initialQuery}
-            />
-          )}
-          {tab === "discover" && <InfoRadar settings={settings} />}
-          {tab === "cleaner" && <Cleaner />}
-          {tab === "compare" && <Compare settings={settings} />}
-          {tab === "ai" && <AiPanel settings={settings} />}
-          {tab === "backup" && <BackupPage />}
-          {tab === "settings" && <SettingsPage />}
+        <main className="relative z-10 min-h-0 flex-1 overflow-hidden">
+          <div
+            className={cn(
+              "mx-auto h-full w-full max-w-[1660px] px-4 sm:px-6 lg:px-8",
+              isDashboard ? "py-4 lg:py-5" : "py-5 lg:py-6",
+            )}
+          >
+            {isDashboard ? (
+              <Dashboard
+                settings={settings}
+                initialQuery={initialQuery}
+              />
+            ) : (
+              <SettingsPage
+                section={route.section}
+                onSectionChange={navigateSettings}
+                onBack={navigateDashboard}
+              />
+            )}
+          </div>
         </main>
-
-        <YearProgress />
-        <footer className="py-4 text-center text-xs text-muted-foreground">
-          Smart Bookmark · {t("app.tagline")}
-        </footer>
       </div>
 
       {qr && (
@@ -163,41 +182,12 @@ export default function App() {
             const params = new URLSearchParams(window.location.hash.slice(1));
             params.delete("qr");
             const s = params.toString();
-            window.history.replaceState(null, "", s ? "#" + s : "#");
+            window.history.replaceState(null, "", s ? "#" + s : window.location.pathname);
           }}
         />
       )}
 
       <ToastHost />
-    </div>
-  );
-}
-
-function YearProgress() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const start = new Date(year, 0, 1).getTime();
-  const end = new Date(year + 1, 0, 1).getTime();
-  const pct = ((now.getTime() - start) / (end - start)) * 100;
-  const cells = 20;
-  const done = Math.round((pct / 100) * cells);
-  return (
-    <div className="mx-auto flex max-w-md items-center justify-center gap-2 py-4 text-[11px] text-muted-foreground">
-      <span>{year} 年过去</span>
-      <div className="flex gap-1">
-        {Array.from({ length: cells }).map((_, i) => (
-          <span
-            key={i}
-            className={
-              "h-2 w-2 rounded-sm " +
-              (i < done
-                ? "bg-gradient-to-br from-indigo-500 to-fuchsia-500"
-                : "bg-muted")
-            }
-          />
-        ))}
-      </div>
-      <span>{pct.toFixed(1)}%</span>
     </div>
   );
 }

@@ -28,6 +28,22 @@ export async function moveBookmark(id: string, parentId: string, index?: number)
   await chrome.bookmarks.move(id, { parentId, index });
 }
 
+export async function updateBookmark(
+  id: string,
+  changes: { title?: string; url?: string },
+): Promise<BookmarkNode | undefined> {
+  if (!hasChromeBookmarks) return undefined;
+  return await chrome.bookmarks.update(id, changes);
+}
+
+export async function createFolder(
+  parentId: string,
+  title: string,
+): Promise<BookmarkNode | undefined> {
+  if (!hasChromeBookmarks) return undefined;
+  return await chrome.bookmarks.create({ parentId, title });
+}
+
 export function flatten(nodes: BookmarkNode[], pathPrefix = ""): FlatBookmark[] {
   const out: FlatBookmark[] = [];
   const walk = (node: BookmarkNode, path: string) => {

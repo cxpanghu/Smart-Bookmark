@@ -2,12 +2,10 @@ import { useId, useMemo } from "react";
 import type { BookmarkNode } from "@/types";
 import { cn } from "@/lib/utils";
 import { ChevronRight, Pin, PinOff } from "lucide-react";
+import { useT } from "@/lib/i18n";
 
 /**
- * 扁平 3D 风格的彩色文件夹图标。统一品牌色（indigo/violet），与整体设计系统一致。
- * - open=false: 闭合，有背板 tab 与前片高光
- * - open=true:  打开，露出一张纸，前片向前倾
- * - variant="all": 用品牌主色（更深的 fuchsia/indigo 混色）表示「全部书签」
+ * 扁平 3D 风格的彩色文件夹图标。统一品牌色系（indigo/violet），与整体设计系统一致。
  */
 function FolderIcon({
   open,
@@ -106,6 +104,7 @@ export interface FolderTreeProps {
   onToggle: (id: string) => void;
   onSelect: (id: string | "") => void;
   onTogglePin: (id: string) => void;
+  onContextMenu?: (folder: { id: string; title: string }, event: React.MouseEvent) => void;
 }
 
 interface FolderItem {
@@ -118,6 +117,7 @@ interface FolderItem {
 }
 
 export default function FolderTree(props: FolderTreeProps) {
+  const t = useT();
   const {
     tree,
     selectedId,
@@ -126,29 +126,50 @@ export default function FolderTree(props: FolderTreeProps) {
     onToggle,
     onSelect,
     onTogglePin,
+    onContextMenu,
   } = props;
 
-  const items = useMemo(() => flattenForTree(tree, expanded), [tree, expanded]);
+  const items = useMemo(
+    () => flattenForTree(tree, expanded, t("dash.untitled")),
+    [tree, expanded, t],
+  );
+
+  const totalCount = useMemo(
+    () => tree.reduce((sum, node) => sum + countBookmarks(node), 0),
+    [tree],
+  );
 
   return (
-    <div className="space-y-0.5 text-sm">
+    <div className="space-y-0.5 text-[13px]">
       <button
         onClick={() => onSelect("")}
         className={cn(
-          "relative flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted/60",
+          "relative flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left transition-colors",
           !selectedId
-            ? "bg-primary/10 font-medium text-primary before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary"
-            : "text-foreground/85",
+            ? "bg-primary/10 font-medium text-primary ring-1 ring-inset ring-primary/15"
+            : "text-foreground/85 hover:bg-accent/70",
         )}
       >
         <FolderIcon
           variant="all"
           className={cn(
-            "h-[18px] w-[18px] shrink-0 drop-shadow-sm transition-transform",
+            "h-4 w-4 shrink-0 transition-transform",
             !selectedId ? "scale-105" : "opacity-90",
           )}
         />
-        <span className="flex-1 truncate">全部书签</span>
+        <span className="flex-1 truncate">{t("dash.allBookmarks")}</span>
+        {totalCount > 0 && (
+          <span
+            className={cn(
+              "shrink-0 rounded-md px-1.5 py-0.5 text-[10.5px] font-medium tabular-nums leading-none",
+              !selectedId
+                ? "bg-primary/15 text-primary"
+                : "bg-muted/75 text-muted-foreground",
+            )}
+          >
+            {totalCount}
+          </span>
+        )}
       </button>
 
       {items.map((f) => {
@@ -158,53 +179,61 @@ export default function FolderTree(props: FolderTreeProps) {
         return (
           <div
             key={f.id}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              onContextMenu?.({ id: f.id, title: f.title }, event);
+            }}
             className={cn(
-              "group relative flex items-center gap-1 rounded-md pr-1 transition-colors hover:bg-muted/60",
-              isSelected &&
-                "bg-primary/10 text-primary before:absolute before:inset-y-1 before:left-0 before:w-[2px] before:rounded-full before:bg-primary",
+              "group relative flex h-8 items-center gap-0.5 rounded-lg pr-1 transition-colors",
+              isSelected
+                ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/15"
+                : "hover:bg-accent/70",
             )}
-            style={{ paddingLeft: Math.max(0, f.depth - 1) * 14 + "px" }}
+            style={{ paddingLeft: Math.max(0, f.depth - 1) * 13 + "px" }}
           >
             <button
               type="button"
               onClick={() => f.hasChildren && onToggle(f.id)}
               className={cn(
-                "flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition hover:bg-background/60",
+                "flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground transition hover:bg-background/70 hover:text-foreground",
                 !f.hasChildren && "invisible",
               )}
-              aria-label="toggle"
+              aria-label={t("folder.toggle")}
             >
               <ChevronRight
                 className={cn(
-                  "h-3.5 w-3.5 transition-transform",
+                  "h-3 w-3 transition-transform duration-150",
                   isExpanded && "rotate-90",
                 )}
               />
             </button>
             <button
               onClick={() => onSelect(f.id)}
-              className="flex min-w-0 flex-1 items-center gap-2 py-1.5 text-left"
+              className="flex h-full min-w-0 flex-1 items-center gap-2 text-left"
               title={f.title}
             >
               <FolderIcon
                 open={isExpanded}
                 variant={isSelected ? "all" : "default"}
                 className={cn(
-                  "h-[18px] w-[18px] shrink-0 drop-shadow-sm transition-transform",
-                  isSelected ? "scale-105" : "opacity-95 group-hover:opacity-100",
+                  "h-4 w-4 shrink-0 transition-transform",
+                  isSelected ? "scale-105" : "opacity-90 group-hover:opacity-100",
                 )}
               />
               <span
-                className={cn("flex-1 truncate", isSelected && "font-medium")}
+                className={cn(
+                  "flex-1 truncate",
+                  isSelected ? "font-medium" : "text-foreground/85",
+                )}
               >
-                {f.title || "(未命名)"}
+                {f.title || t("dash.untitled")}
               </span>
               <span
                 className={cn(
-                  "shrink-0 text-[11px] tabular-nums transition-colors",
+                  "shrink-0 rounded-md px-1.5 py-0.5 text-[10.5px] tabular-nums leading-none transition-colors",
                   isSelected
-                    ? "text-primary/80"
-                    : "text-muted-foreground",
+                    ? "bg-primary/15 font-medium text-primary"
+                    : "text-muted-foreground group-hover:bg-muted/80",
                 )}
               >
                 {f.count}
@@ -217,15 +246,15 @@ export default function FolderTree(props: FolderTreeProps) {
                 onTogglePin(f.id);
               }}
               className={cn(
-                "h-6 w-6 rounded text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-background/60",
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-background/80 hover:text-foreground",
                 isPinned && "opacity-100 text-primary",
               )}
-              title={isPinned ? "取消置顶" : "置顶"}
+              title={isPinned ? t("folder.unpin") : t("folder.pin")}
             >
               {isPinned ? (
-                <Pin className="mx-auto h-3.5 w-3.5" />
+                <Pin className="h-3 w-3" />
               ) : (
-                <PinOff className="mx-auto h-3.5 w-3.5" />
+                <PinOff className="h-3 w-3" />
               )}
             </button>
           </div>
@@ -238,6 +267,7 @@ export default function FolderTree(props: FolderTreeProps) {
 function flattenForTree(
   tree: BookmarkNode[],
   expanded: Set<string>,
+  untitled: string,
 ): FolderItem[] {
   const out: FolderItem[] = [];
   const walk = (
@@ -251,7 +281,7 @@ function flattenForTree(
       const count = countBookmarks(node);
       out.push({
         id: node.id,
-        title: node.title || "(未命名)",
+        title: node.title || untitled,
         depth,
         count,
         hasChildren: subFolders.length > 0,

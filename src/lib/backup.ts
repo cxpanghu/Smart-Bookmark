@@ -1,5 +1,6 @@
-import type { BookmarkNode } from "@/types";
+import type { BookmarkNode, CleanIssue } from "@/types";
 import { flatten, getTree } from "@/lib/bookmarks";
+import { normalizeUrl } from "@/lib/utils";
 
 export interface BackupNode {
   title: string;
@@ -16,6 +17,21 @@ export interface BackupFile {
   tree: BackupNode[];
 }
 
+const TRASH_SNAPSHOT_PREFIX = "sb::trash-snapshot::";
+
+export interface TrashSnapshotEntry {
+  sourceId: string;
+  parentId?: string;
+  index?: number;
+  node: BackupNode;
+}
+
+export interface TrashSnapshot {
+  key: string;
+  createdAt: number;
+  entries: TrashSnapshotEntry[];
+}
+
 function toBackupNode(n: BookmarkNode): BackupNode {
   return {
     title: n.title || "",
@@ -24,6 +40,126 @@ function toBackupNode(n: BookmarkNode): BackupNode {
     dateGroupModified: (n as any).dateGroupModified,
     children: n.children?.map(toBackupNode),
   };
+}
+
+export async function createTrashSnapshot(
+  issues: CleanIssue[],
+): Promise<TrashSnapshot | null> {
+  if (typeof chrome === "undefined" || !chrome.bookmarks || !chrome.storage?.local)
+    return null;
+  const entries: TrashSnapshotEntry[] = [];
+  const seen = new Set<string>();
+  for (const issue of issues) {
+    const sourceId = issue.folderId ?? issue.bookmark?.id;
+    if (!sourceId || seen.has(sourceId)) continue;
+    seen.add(sourceId);
+    try {
+      const [root] = await chrome.bookmarks.getSubTree(sourceId);
+      if (!root) continue;
+      entries.push({
+        sourceId,
+        parentId: root.parentId,
+        index: root.index,
+        node: toBackupNode(root),
+      });
+    } catch {
+      // The item may have disappeared between scan and confirmation.
+    }
+  }
+  if (entries.length === 0) return null;
+  const createdAt = Date.now();
+  const key = `${TRASH_SNAPSHOT_PREFIX}${createdAt}`;
+  const snapshot: TrashSnapshot = { key, createdAt, entries };
+  await chrome.storage.local.set({ [key]: snapshot });
+  const existing = await listTrashSnapshots();
+  const stale = existing.slice(3);
+  if (stale.length > 0) {
+    await chrome.storage.local.remove(stale.map((item) => item.key));
+  }
+  return snapshot;
+}
+
+export async function listTrashSnapshots(): Promise<TrashSnapshot[]> {
+  if (typeof chrome === "undefined" || !chrome.storage?.local) return [];
+  const stored = await chrome.storage.local.get(null);
+  return Object.entries(stored)
+    .filter(([key]) => key.startsWith(TRASH_SNAPSHOT_PREFIX))
+    .map(([key, value]) => ({ ...(value as TrashSnapshot), key }))
+    .filter((value) => Array.isArray(value.entries))
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export async function restoreTrashSnapshot(
+  snapshotOrKey: TrashSnapshot | string,
+): Promise<{ restored: number; skipped: number; failed: number }> {
+  if (typeof chrome === "undefined" || !chrome.bookmarks || !chrome.storage?.local)
+    return { restored: 0, skipped: 0, failed: 0 };
+  let snapshot: TrashSnapshot | undefined;
+  if (typeof snapshotOrKey === "string") {
+    const stored = await chrome.storage.local.get(snapshotOrKey);
+    snapshot = stored[snapshotOrKey] as TrashSnapshot | undefined;
+  } else {
+    snapshot = snapshotOrKey;
+  }
+  if (!snapshot) return { restored: 0, skipped: 0, failed: 0 };
+
+  const tree = await chrome.bookmarks.getTree();
+  const fallbackParent = tree[0]?.children?.[0]?.id ?? "1";
+  const recreatedFolders = new Map<string, string>();
+  let restored = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  const exists = async (id?: string) => {
+    if (!id) return false;
+    try {
+      return (await chrome.bookmarks.get(id)).length > 0;
+    } catch {
+      return false;
+    }
+  };
+
+  const restoreNode = async (
+    node: BackupNode,
+    parentId: string,
+    index?: number,
+    sourceId?: string,
+  ) => {
+    const created = await chrome.bookmarks.create({
+      parentId,
+      index,
+      title: node.title || node.url || "Untitled",
+      ...(node.url ? { url: node.url } : {}),
+    });
+    restored++;
+    if (!node.url && sourceId) recreatedFolders.set(sourceId, created.id);
+    for (const child of node.children ?? []) {
+      await restoreNode(child, created.id);
+    }
+  };
+
+  for (const entry of snapshot.entries) {
+    if (await exists(entry.sourceId)) {
+      skipped++;
+      continue;
+    }
+    const mappedParent = entry.parentId
+      ? recreatedFolders.get(entry.parentId)
+      : undefined;
+    const parentId =
+      mappedParent ?? ((await exists(entry.parentId)) ? entry.parentId! : fallbackParent);
+    try {
+      await restoreNode(entry.node, parentId, entry.index, entry.sourceId);
+    } catch {
+      failed++;
+    }
+  }
+
+  // 有恢复失败时保留快照，避免瞬时错误导致剩余恢复源永久丢失。
+  if (failed === 0) {
+    await chrome.storage.local.remove(snapshot.key);
+  }
+  return { restored, skipped, failed };
 }
 
 export async function buildBackup(): Promise<BackupFile> {
@@ -211,15 +347,8 @@ export async function importIntoFolder(
   return { added, skipped };
 }
 
-function normalize(u: string) {
-  try {
-    const url = new URL(u);
-    url.hash = "";
-    return url.toString().toLowerCase();
-  } catch {
-    return u.toLowerCase();
-  }
-}
+// 与清理器共用同一套 URL 归一化（hostname 小写、path/query 保留大小写）。
+const normalize = normalizeUrl;
 
 export async function collectExistingUrls(): Promise<Set<string>> {
   const tree = await getTree();

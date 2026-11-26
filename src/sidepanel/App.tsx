@@ -1,21 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
-import { findFolder, getTree, flatten } from "@/lib/bookmarks";
+import { findFolder, flatten } from "@/lib/bookmarks";
 import type { BookmarkNode, FlatBookmark, Settings } from "@/types";
 import { Input } from "@/components/ui/input";
 import {
   Bookmark,
-  Search,
-  Folder,
   ChevronRight,
+  ExternalLink,
+  Folder,
   History as HistoryIcon,
+  Search,
+  X,
 } from "lucide-react";
-import { faviconOf, hostnameOf, cn } from "@/lib/utils";
+import { hostnameOf, cn } from "@/lib/utils";
+import SiteIcon from "@/components/SiteIcon";
 import { useT } from "@/lib/i18n";
 import { getSettings, onSettingsChange, setSettings } from "@/lib/storage";
 import ThemeToggle from "@/components/ThemeToggle";
-import ThemeSwitcher from "@/components/ThemeSwitcher";
 import EngineSwitcher from "@/components/EngineSwitcher";
 import { findEngine } from "@/lib/engines";
+import { rankSearchItems } from "@/lib/searchRank";
+import { useBookmarkTree } from "@/hooks/useBookmarkTree";
 
 interface HistoryHit {
   url: string;
@@ -24,28 +28,17 @@ interface HistoryHit {
 
 export default function SidePanel() {
   const t = useT();
-  const [tree, setTree] = useState<BookmarkNode[]>([]);
+  const { tree } = useBookmarkTree();
   const [settings, setSettingsState] = useState<Settings | null>(null);
   const [query, setQuery] = useState("");
   const [openedIds, setOpenedIds] = useState<Set<string>>(new Set());
   const [historyHits, setHistoryHits] = useState<HistoryHit[]>([]);
+  const [activeResult, setActiveResult] = useState(0);
 
   useEffect(() => {
-    getTree().then(setTree);
     getSettings().then(setSettingsState);
     const off = onSettingsChange(setSettingsState);
-    const onChange = () => getTree().then(setTree);
-    chrome.bookmarks?.onCreated?.addListener(onChange);
-    chrome.bookmarks?.onRemoved?.addListener(onChange);
-    chrome.bookmarks?.onChanged?.addListener(onChange);
-    chrome.bookmarks?.onMoved?.addListener(onChange);
-    return () => {
-      off();
-      chrome.bookmarks?.onCreated?.removeListener(onChange);
-      chrome.bookmarks?.onRemoved?.removeListener(onChange);
-      chrome.bookmarks?.onChanged?.removeListener(onChange);
-      chrome.bookmarks?.onMoved?.removeListener(onChange);
-    };
+    return off;
   }, []);
 
   const topLevel: BookmarkNode[] = useMemo(() => {
@@ -60,15 +53,7 @@ export default function SidePanel() {
 
   const flatSearch: FlatBookmark[] = useMemo(() => {
     if (!query.trim()) return [];
-    const q = query.trim().toLowerCase();
-    return flatten(tree)
-      .filter(
-        (b) =>
-          b.title.toLowerCase().includes(q) ||
-          b.url.toLowerCase().includes(q) ||
-          b.path.toLowerCase().includes(q),
-      )
-      .slice(0, 300);
+    return rankSearchItems(query, flatten(tree), 300).map(({ item }) => item);
   }, [tree, query]);
 
   useEffect(() => {
@@ -77,15 +62,35 @@ export default function SidePanel() {
       setHistoryHits([]);
       return;
     }
-    chrome.history?.search?.({ text: q, maxResults: 8 }, (res) => {
-      setHistoryHits(
-        (res || [])
+    const timer = window.setTimeout(() => {
+      chrome.history?.search?.({ text: q, maxResults: 20 }, (res) => {
+        const items = (res || [])
           .filter((x) => x.url)
-          .slice(0, 8)
-          .map((x) => ({ url: x.url!, title: x.title || x.url! })),
-      );
-    });
+          .map((x, index) => ({
+            id: `history-${index}`,
+            url: x.url!,
+            title: x.title || x.url!,
+          }));
+        setHistoryHits(
+          rankSearchItems(q, items, 8).map(({ item }) => ({
+            url: item.url,
+            title: item.title,
+          })),
+        );
+      });
+    }, 180);
+    return () => window.clearTimeout(timer);
   }, [query]);
+
+  useEffect(() => setActiveResult(0), [query]);
+
+  const searchTargets = useMemo(
+    () => [
+      ...flatSearch.map((item) => ({ url: item.url })),
+      ...historyHits.map((item) => ({ url: item.url })),
+    ],
+    [flatSearch, historyHits],
+  );
 
   const onChangeEngine = async (id: string) => {
     await setSettings({ searchEngine: id });
@@ -96,7 +101,7 @@ export default function SidePanel() {
     if (!settings) return;
     const q = query.trim();
     if (!q) return;
-    const hit = flatSearch[0];
+    const hit = searchTargets[activeResult] ?? searchTargets[0];
     if (hit) {
       window.open(hit.url, "_blank");
       return;
@@ -147,16 +152,40 @@ export default function SidePanel() {
     return (n.children ?? []).filter((c) => !c.url);
   };
 
+  const openFullDashboard = () => {
+    const url =
+      typeof chrome !== "undefined" && chrome.runtime?.getURL
+        ? chrome.runtime.getURL("newtab.html")
+        : "/newtab.html";
+    window.open(url, "_blank");
+  };
+
   return (
-    <div className="flex h-screen flex-col bg-gradient-to-b from-background to-background/60 text-foreground">
-      <header className="border-b px-3 pb-3 pt-4">
-        <div className="mb-3 flex items-center gap-2">
-          <Bookmark className="h-4 w-4 text-primary" />
-          <span className="flex-1 font-semibold">{t("side.title")}</span>
-          <ThemeSwitcher variant="icon" />
-          <ThemeToggle />
+    <div className="flex h-screen flex-col bg-background text-foreground">
+      <header className="sticky top-0 z-20 border-b border-border/75 bg-background/85 px-3 pb-3 pt-3.5 backdrop-blur-xl">
+        <div className="mb-2.5 flex items-center gap-2">
+          <div className="flex h-6 w-6 items-center justify-center rounded-[7px] bg-foreground text-background shadow-sm">
+            <Bookmark className="h-3.5 w-3.5" strokeWidth={2.2} />
+          </div>
+          <span className="flex-1 truncate text-[13.5px] font-semibold tracking-tight">
+            {t("side.title")}
+          </span>
+          <button
+            type="button"
+            onClick={openFullDashboard}
+            title={t("popup.dashboard")}
+            aria-label={t("popup.dashboard")}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-border/80 bg-card/80 text-muted-foreground transition hover:border-border hover:bg-accent hover:text-foreground"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+          </button>
+          <ThemeToggle variant="icon" className="h-7 w-7" />
         </div>
-        <form onSubmit={onSubmitSearch} className="flex items-center gap-1 rounded-full border bg-card pl-1 pr-1">
+
+        <form
+          onSubmit={onSubmitSearch}
+          className="bento-surface flex items-center gap-1 rounded-xl p-1 transition focus-within:border-foreground/30 focus-within:ring-2 focus-within:ring-foreground/10"
+        >
           {settings && (
             <EngineSwitcher
               settings={settings}
@@ -165,32 +194,65 @@ export default function SidePanel() {
             />
           )}
           <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(event) => {
+                if (
+                  (event.key === "ArrowDown" || event.key === "ArrowUp") &&
+                  searchTargets.length > 0
+                ) {
+                  event.preventDefault();
+                  const delta = event.key === "ArrowDown" ? 1 : -1;
+                  setActiveResult(
+                    (index) =>
+                      (index + delta + searchTargets.length) %
+                      searchTargets.length,
+                  );
+                } else if (event.key === "Escape" && query) {
+                  setQuery("");
+                }
+              }}
               placeholder={t("side.placeholder")}
-              className="h-9 border-0 bg-transparent pl-8 shadow-none focus-visible:ring-0"
+              className="h-8 border-0 bg-transparent pl-7 pr-1 text-[13px] shadow-none focus-visible:bg-transparent focus-visible:ring-0"
             />
           </div>
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition hover:bg-accent hover:text-foreground"
+              aria-label={t("dash.searchClear")}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </form>
       </header>
 
       <div className="flex-1 overflow-auto scrollbar-thin">
         {query.trim() ? (
-          <SearchResults items={flatSearch} historyHits={historyHits} />
+          <SearchResults
+            items={flatSearch}
+            historyHits={historyHits}
+            activeIndex={activeResult}
+            onActiveChange={setActiveResult}
+          />
         ) : (
           <>
             {pinnedFolder && pinnedBookmarks.length > 0 && (
               <section className="px-3 pt-3">
-                <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{pinnedFolder.title}</span>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="truncate text-[11.5px] font-semibold text-muted-foreground">
+                    {pinnedFolder.title}
+                  </span>
                   {topLevel.length > 1 && (
                     <select
                       value={pinnedFolder.id}
-                      onChange={(e) => onPickPinned(e.target.value)}
-                      className="rounded-md border bg-background px-2 py-1 text-xs"
+                      onChange={(e) => void onPickPinned(e.target.value)}
+                      className="h-6 max-w-[140px] rounded-md border border-border/80 bg-card px-1.5 text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
                     >
                       {topLevel.map((f) => (
                         <option key={f.id} value={f.id}>
@@ -200,7 +262,7 @@ export default function SidePanel() {
                     </select>
                   )}
                 </div>
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-4 gap-2">
                   {pinnedBookmarks.map((b) => (
                     <a
                       key={b.id}
@@ -208,19 +270,16 @@ export default function SidePanel() {
                       target="_blank"
                       rel="noreferrer"
                       className="group flex flex-col items-center gap-1"
-                      title={b.url}
+                      title={`${b.title}\n${b.url}`}
                     >
-                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-background shadow-sm ring-1 ring-border transition group-hover:-translate-y-0.5 group-hover:shadow-md">
-                        <img
-                          src={faviconOf(b.url)}
-                          alt=""
-                          className="h-5 w-5"
-                          onError={(e) =>
-                            (e.currentTarget.style.visibility = "hidden")
-                          }
+                      <div className="bento-surface flex h-10 w-10 items-center justify-center rounded-xl transition duration-150 group-hover:-translate-y-0.5 group-hover:border-foreground/30">
+                        <SiteIcon
+                          url={b.url}
+                          title={b.title}
+                          className="h-5 w-5 text-[9px]"
                         />
                       </div>
-                      <div className="w-full truncate text-center text-[10px] text-muted-foreground">
+                      <div className="w-full truncate text-center text-[10.5px] font-medium text-foreground/80 group-hover:text-foreground">
                         {b.title}
                       </div>
                     </a>
@@ -229,9 +288,9 @@ export default function SidePanel() {
               </section>
             )}
 
-            <section className="mt-4 px-3 pb-3">
-              <div className="mb-2 px-1 text-xs font-medium text-muted-foreground">
-                收藏夹栏
+            <section className="mt-4 px-3 pb-4">
+              <div className="mb-2 px-0.5 text-[11.5px] font-semibold text-muted-foreground">
+                {t("side.bookmarksBar")}
               </div>
               <div className="space-y-1.5">
                 {topLevel.map((f) => (
@@ -269,50 +328,58 @@ function SidepanelFolder({
   subFoldersOf: (n: BookmarkNode) => BookmarkNode[];
   depth: number;
 }) {
+  const t = useT();
   const isOpen = openedIds.has(folder.id);
   const links = isOpen ? linksOf(folder) : [];
   const subs = isOpen ? subFoldersOf(folder) : [];
   const count = countAll(folder);
-  const header = (
-    <button
-      onClick={() => onToggle(folder.id)}
-      className={cn(
-        "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-accent",
-        depth === 0 ? "border bg-card shadow-sm" : "",
-      )}
-      style={{ paddingLeft: 12 + depth * 10 + "px" }}
-    >
-      <div
-        className={cn(
-          "flex items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500/20 to-fuchsia-500/20 text-primary",
-          depth === 0 ? "h-7 w-7" : "h-5 w-5",
-        )}
-      >
-        <Folder className={depth === 0 ? "h-4 w-4" : "h-3 w-3"} />
-      </div>
-      <span
-        className={cn(
-          "flex-1 truncate text-sm",
-          depth === 0 && "font-medium",
-        )}
-      >
-        {folder.title || "(未命名)"}
-      </span>
-      <span className="text-xs text-muted-foreground">{count}</span>
-      <ChevronRight
-        className={cn(
-          "h-4 w-4 text-muted-foreground transition-transform",
-          isOpen && "rotate-90",
-        )}
-      />
-    </button>
-  );
 
   return (
-    <div className={depth === 0 ? "rounded-xl" : ""}>
-      {header}
+    <div className={cn(depth === 0 && "bento-surface overflow-hidden rounded-xl")}>
+      <button
+        onClick={() => onToggle(folder.id)}
+        className={cn(
+          "flex w-full items-center gap-2.5 text-left transition",
+          depth === 0
+            ? "px-2.5 py-2 hover:bg-accent/55"
+            : "rounded-lg px-2 py-1.5 hover:bg-accent/70",
+        )}
+        style={depth > 0 ? { paddingLeft: 8 + depth * 10 + "px" } : undefined}
+      >
+        <div
+          className={cn(
+            "flex shrink-0 items-center justify-center rounded-lg bg-muted text-foreground/80",
+            depth === 0 ? "h-6 w-6" : "h-5 w-5",
+          )}
+        >
+          <Folder className={depth === 0 ? "h-3.5 w-3.5" : "h-3 w-3"} />
+        </div>
+        <span
+          className={cn(
+            "flex-1 truncate text-[12.5px]",
+            depth === 0 ? "font-medium" : "text-foreground/90",
+          )}
+        >
+          {folder.title || t("dash.untitled")}
+        </span>
+        <span className="rounded-md bg-muted/80 px-1.5 py-0.5 text-[10px] tabular-nums leading-none text-muted-foreground">
+          {count}
+        </span>
+        <ChevronRight
+          className={cn(
+            "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-150",
+            isOpen && "rotate-90",
+          )}
+        />
+      </button>
+
       {isOpen && (
-        <div className={cn("mt-1 space-y-1", depth >= 0 && "pl-2")}>
+        <div
+          className={cn(
+            "space-y-0.5",
+            depth === 0 ? "border-t border-border/60 bg-muted/20 p-1.5" : "mt-0.5 pl-2",
+          )}
+        >
           {subs.map((s) => (
             <SidepanelFolder
               key={s.id}
@@ -325,33 +392,35 @@ function SidepanelFolder({
             />
           ))}
           {links.length > 0 && (
-            <div className="space-y-0.5 rounded-lg">
-              {links.slice(0, 50).map((b) => (
+            <div className="space-y-0.5">
+              {links.slice(0, 80).map((b) => (
                 <a
                   key={b.id}
                   href={b.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-2 rounded-md px-2 py-1 text-xs transition hover:bg-accent"
-                  style={{ paddingLeft: 14 + depth * 10 + "px" }}
-                  title={b.url}
+                  className="group flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition hover:bg-accent/80"
+                  style={depth > 0 ? { paddingLeft: 10 + depth * 10 + "px" } : undefined}
+                  title={`${b.title}\n${b.url}`}
                 >
-                  <img
-                    src={faviconOf(b.url, 16)}
-                    alt=""
-                    className="h-4 w-4 rounded"
-                    onError={(e) => (e.currentTarget.style.display = "none")}
+                  <SiteIcon
+                    url={b.url}
+                    title={b.title}
+                    size={16}
+                    className="h-4 w-4 shrink-0 text-[8px]"
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate">{b.title}</div>
+                    <div className="truncate font-medium text-foreground/90 group-hover:text-foreground">
+                      {b.title}
+                    </div>
                   </div>
                 </a>
               ))}
             </div>
           )}
           {links.length === 0 && subs.length === 0 && (
-            <div className="px-3 py-1 text-[11px] text-muted-foreground">
-              空
+            <div className="px-2.5 py-1 text-[11px] text-muted-foreground">
+              {t("side.emptyFolder")}
             </div>
           )}
         </div>
@@ -363,80 +432,113 @@ function SidepanelFolder({
 function SearchResults({
   items,
   historyHits,
+  activeIndex,
+  onActiveChange,
 }: {
   items: FlatBookmark[];
   historyHits: HistoryHit[];
+  activeIndex: number;
+  onActiveChange: (index: number) => void;
 }) {
   const t = useT();
   const hasBookmarks = items.length > 0;
   const hasHistory = historyHits.length > 0;
   if (!hasBookmarks && !hasHistory)
     return (
-      <div className="p-8 text-center text-sm text-muted-foreground">
+      <div className="p-8 text-center text-xs text-muted-foreground">
         {t("side.empty")}
       </div>
     );
   return (
-    <div>
+    <div className="space-y-3 p-2">
       {hasBookmarks && (
         <div>
-          <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-            <Bookmark className="mr-1 inline h-3 w-3" /> 书签
+          <div className="mb-1 flex items-center gap-1 px-2 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <Bookmark className="h-3 w-3 text-foreground/80" />
+            <span>{t("side.bookmarks")}</span>
           </div>
-          {items.map((b) => (
-            <a
-              key={b.id}
-              href={b.url}
-              target="_blank"
-              rel="noreferrer"
-              className="group flex items-start gap-2 border-b px-3 py-2 text-sm transition hover:bg-accent"
-              title={b.url}
-            >
-              <img
-                src={faviconOf(b.url, 16)}
-                alt=""
-                className="mt-0.5 h-4 w-4 rounded"
-                onError={(e) => (e.currentTarget.style.display = "none")}
-              />
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{b.title}</div>
-                <div className="truncate text-xs text-muted-foreground">
-                  {hostnameOf(b.url)}
-                  {b.path ? ` · ${b.path}` : ""}
+          <div className="space-y-0.5">
+            {items.map((b, index) => (
+              <a
+                key={b.id}
+                href={b.url}
+                target="_blank"
+                rel="noreferrer"
+                className={cn(
+                  "group flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs transition",
+                  activeIndex === index
+                    ? "bg-accent ring-1 ring-inset ring-border"
+                    : "hover:bg-accent/75",
+                )}
+                onMouseEnter={() => onActiveChange(index)}
+                title={b.url}
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-card">
+                  <SiteIcon
+                    url={b.url}
+                    title={b.title}
+                    size={16}
+                    className="h-4 w-4 text-[8px]"
+                  />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[12.5px] font-medium text-foreground">
+                    {b.title}
+                  </div>
+                  <div className="truncate text-[11px] text-muted-foreground">
+                    {hostnameOf(b.url)}
+                    {b.path ? ` · ${b.path}` : ""}
+                  </div>
                 </div>
-              </div>
-            </a>
-          ))}
+              </a>
+            ))}
+          </div>
         </div>
       )}
       {hasHistory && (
-        <div className="mt-2">
-          <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-            <HistoryIcon className="mr-1 inline h-3 w-3" /> 浏览历史
+        <div>
+          <div className="mb-1 flex items-center gap-1 px-2 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <HistoryIcon className="h-3 w-3 text-amber-500" />
+            <span>{t("side.history")}</span>
           </div>
-          {historyHits.map((h) => (
-            <a
-              key={h.url}
-              href={h.url}
-              target="_blank"
-              rel="noreferrer"
-              className="group flex items-start gap-2 border-b px-3 py-2 text-sm transition hover:bg-accent"
-              title={h.url}
-            >
-              <img
-                src={faviconOf(h.url, 16)}
-                alt=""
-                className="mt-0.5 h-4 w-4 rounded"
-                onError={(e) => (e.currentTarget.style.display = "none")}
-              />
-              <div className="min-w-0 flex-1">
-                <div className="truncate">{h.title}</div>
-                <div className="truncate text-xs text-muted-foreground">
-                  {hostnameOf(h.url)}
-                </div>
-              </div>
-            </a>
-          ))}
+          <div className="space-y-0.5">
+            {historyHits.map((h, index) => {
+              const resultIndex = items.length + index;
+              return (
+                <a
+                  key={h.url}
+                  href={h.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={cn(
+                    "group flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-xs transition",
+                    activeIndex === resultIndex
+                      ? "bg-accent ring-1 ring-inset ring-border"
+                      : "hover:bg-accent/75",
+                  )}
+                  onMouseEnter={() => onActiveChange(resultIndex)}
+                  title={h.url}
+                >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-card">
+                    <SiteIcon
+                      url={h.url}
+                      title={h.title}
+                      size={16}
+                      className="h-4 w-4 text-[8px]"
+                    />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[12.5px] font-medium text-foreground">
+                      {h.title}
+                    </div>
+                    <div className="truncate text-[11px] text-muted-foreground">
+                      {hostnameOf(h.url)}
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

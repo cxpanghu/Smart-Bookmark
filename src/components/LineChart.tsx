@@ -1,3 +1,5 @@
+import { useT } from "@/lib/i18n";
+
 interface Point {
   label: string;
   count: number;
@@ -10,8 +12,9 @@ export default function LineChart({
   data: Point[];
   height?: number;
 }) {
+  const t = useT();
   if (data.length === 0) {
-    return <div className="text-xs text-muted-foreground">暂无数据</div>;
+    return <div className="text-xs text-muted-foreground">{t("common.noData")}</div>;
   }
   const width = 440;
   const padding = { left: 28, right: 12, top: 8, bottom: 22 };
@@ -30,6 +33,11 @@ export default function LineChart({
   const areaD =
     pathD +
     ` L${coords[coords.length - 1].x.toFixed(1)},${padding.top + ih} L${coords[0].x.toFixed(1)},${padding.top + ih} Z`;
+  const tickIndexes = new Set([
+    0,
+    Math.floor((coords.length - 1) / 2),
+    coords.length - 1,
+  ]);
 
   return (
     <svg
@@ -57,7 +65,8 @@ export default function LineChart({
           />
         );
       })}
-      {coords.map((c, i) => (
+      {coords.map((c, i) =>
+        tickIndexes.has(i) ? (
         <text
           key={`x-${i}`}
           x={c.x}
@@ -67,7 +76,8 @@ export default function LineChart({
         >
           {c.label}
         </text>
-      ))}
+        ) : null,
+      )}
       <path
         d={areaD}
         fill="url(#lc-grad)"

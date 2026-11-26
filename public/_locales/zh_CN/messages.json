@@ -3,6 +3,33 @@
     "message": "Smart Bookmark - 书签清理 + 新标签页"
   },
   "extDescription": {
-    "message": "书签清理 + 新标签页看板 + AI 搜索，二合一浏览器扩展。Chrome / Edge 双平台。"
+    "message": "本地优先的书签管理、清理、备份与新标签页看板。适用于 Chrome 和 Edge。"
+  },
+  "menuSearchBookmarks": {
+    "message": "在 Smart Bookmark 中搜索 \"%s\""
+  },
+  "menuCopyPageUrl": {
+    "message": "复制当前页面地址"
+  },
+  "menuCopyLinkUrl": {
+    "message": "复制链接地址"
+  },
+  "menuQrPage": {
+    "message": "生成当前页面二维码"
+  },
+  "menuQrLink": {
+    "message": "生成链接二维码"
+  },
+  "menuOpenCleaner": {
+    "message": "打开书签清理中心"
+  },
+  "menuOpenSidePanel": {
+    "message": "打开 Smart Bookmark 侧边栏"
+  },
+  "commandOpenSidePanel": {
+    "message": "打开 Smart Bookmark 侧边栏"
+  },
+  "commandOpenCleaner": {
+    "message": "打开书签清理中心"
   }
 }

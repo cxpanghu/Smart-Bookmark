@@ -4,65 +4,32 @@ export interface EngineDef {
   id: string;
   name: string;
   url: (q: string) => string;
-  /** URL pattern used for favicon lookup */
+  /** URL host used for icon lookup */
   host: string;
   iframe?: boolean;
 }
 
+/**
+ * 内置传统/专业搜索引擎（已剔除所有 AI 对话搜索入口）。
+ */
 export const BUILTIN_ENGINES: EngineDef[] = [
   {
     id: "google",
-    name: "谷歌",
+    name: "Google",
     url: (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`,
     host: "google.com",
-  },
-  {
-    id: "baidu",
-    name: "百度",
-    url: (q) => `https://www.baidu.com/s?wd=${encodeURIComponent(q)}`,
-    host: "baidu.com",
-  },
-  {
-    id: "doubao",
-    name: "豆包",
-    url: (q) => `https://www.doubao.com/chat/?q=${encodeURIComponent(q)}`,
-    host: "doubao.com",
-  },
-  {
-    id: "kimi",
-    name: "Kimi",
-    url: (q) => `https://kimi.moonshot.cn/?q=${encodeURIComponent(q)}`,
-    host: "kimi.moonshot.cn",
-  },
-  {
-    id: "deepseek",
-    name: "DeepSeek",
-    url: (q) => `https://chat.deepseek.com/?q=${encodeURIComponent(q)}`,
-    host: "chat.deepseek.com",
-  },
-  {
-    id: "qwen",
-    name: "千问",
-    url: (q) => `https://chat.qwen.ai/?q=${encodeURIComponent(q)}`,
-    host: "chat.qwen.ai",
-  },
-  {
-    id: "chatgpt",
-    name: "GPT",
-    url: (q) => `https://chatgpt.com/?q=${encodeURIComponent(q)}`,
-    host: "chatgpt.com",
-  },
-  {
-    id: "gemini",
-    name: "Gemini",
-    url: (q) => `https://gemini.google.com/app?q=${encodeURIComponent(q)}`,
-    host: "gemini.google.com",
   },
   {
     id: "bing",
     name: "Bing",
     url: (q) => `https://www.bing.com/search?q=${encodeURIComponent(q)}`,
     host: "bing.com",
+  },
+  {
+    id: "baidu",
+    name: "Baidu",
+    url: (q) => `https://www.baidu.com/s?wd=${encodeURIComponent(q)}`,
+    host: "baidu.com",
   },
   {
     id: "duckduckgo",
@@ -91,24 +58,6 @@ export const BUILTIN_ENGINES: EngineDef[] = [
       `https://developer.mozilla.org/en-US/search?q=${encodeURIComponent(q)}`,
     host: "developer.mozilla.org",
     iframe: true,
-  },
-  {
-    id: "felo",
-    name: "Felo",
-    url: (q) => `https://felo.ai/search?q=${encodeURIComponent(q)}`,
-    host: "felo.ai",
-  },
-  {
-    id: "metaso",
-    name: "秘塔",
-    url: (q) => `https://metaso.cn/?q=${encodeURIComponent(q)}`,
-    host: "metaso.cn",
-  },
-  {
-    id: "perplexity",
-    name: "Perplexity",
-    url: (q) => `https://www.perplexity.ai/?q=${encodeURIComponent(q)}`,
-    host: "perplexity.ai",
   },
 ];
 
@@ -142,7 +91,26 @@ export function findEngine(
 }
 
 export function faviconFor(engine: EngineDef): string {
-  return `https://www.google.com/s2/favicons?domain=${engine.host}&sz=64`;
+  try {
+    const pageUrl = new URL(engine.host);
+    return localFavicon(pageUrl.toString(), 64);
+  } catch {
+    return localFavicon(`https://${engine.host}/`, 64);
+  }
+}
+
+function localFavicon(pageUrl: string, size: number): string {
+  if (
+    typeof chrome === "undefined" ||
+    !chrome.runtime?.getURL ||
+    !chrome.runtime?.id
+  ) {
+    return "";
+  }
+  const faviconUrl = new URL(chrome.runtime.getURL("/_favicon/"));
+  faviconUrl.searchParams.set("pageUrl", pageUrl);
+  faviconUrl.searchParams.set("size", String(size));
+  return faviconUrl.toString();
 }
 
 function hostOf(url: string): string {

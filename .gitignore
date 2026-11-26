@@ -7,6 +7,9 @@ dist.zip
 .env
 .env.*
 !.env.example
+AUDIT-REPORT-2026-07-14.md
+*.exe
+*.pub
 
 # IDE / editor
 .cursor/

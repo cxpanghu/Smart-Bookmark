@@ -7,8 +7,18 @@ export function cn(...inputs: ClassValue[]) {
 
 export function faviconOf(url: string, size = 32): string {
   try {
-    const u = new URL(url);
-    return `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=${size}`;
+    new URL(url);
+    if (
+      typeof chrome === "undefined" ||
+      !chrome.runtime?.getURL ||
+      !chrome.runtime?.id
+    ) {
+      return "";
+    }
+    const faviconUrl = new URL(chrome.runtime.getURL("/_favicon/"));
+    faviconUrl.searchParams.set("pageUrl", url);
+    faviconUrl.searchParams.set("size", String(size));
+    return faviconUrl.toString();
   } catch {
     return "";
   }
@@ -48,8 +58,9 @@ export function normalizeUrl(raw: string): string {
     if (u.pathname.endsWith("/") && u.pathname !== "/") {
       u.pathname = u.pathname.replace(/\/+$/, "");
     }
-    return u.toString().toLowerCase();
+    u.hostname = u.hostname.replace(/^www\./i, "").toLowerCase();
+    return u.toString();
   } catch {
-    return raw.toLowerCase();
+    return raw;
   }
 }

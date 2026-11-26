@@ -8,10 +8,7 @@ const MENU_IDS = {
   QR_LINK: "sb-qr-link",
   OPEN_CLEANER: "sb-open-cleaner",
   OPEN_SIDEPANEL: "sb-open-sidepanel",
-  TOGGLE_FLOAT: "sb-toggle-float",
 } as const;
-
-const SETTINGS_KEY = "smart-bookmark::settings";
 
 chrome.runtime.onInstalled.addListener(() => {
   setupContextMenus();
@@ -25,45 +22,42 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.runtime.onStartup?.addListener(() => setupContextMenus());
 
 function setupContextMenus() {
+  const message = (key: string, fallback: string) =>
+    chrome.i18n.getMessage(key) || fallback;
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: MENU_IDS.SEARCH_BOOKMARKS,
-      title: '在 Smart Bookmark 中搜索 "%s"',
+      title: message("menuSearchBookmarks", 'Search Smart Bookmark for "%s"'),
       contexts: ["selection"],
     });
     chrome.contextMenus.create({
       id: MENU_IDS.COPY_URL,
-      title: "复制当前页面地址",
+      title: message("menuCopyPageUrl", "Copy page URL"),
       contexts: ["page"],
     });
     chrome.contextMenus.create({
       id: MENU_IDS.COPY_LINK,
-      title: "复制链接地址",
+      title: message("menuCopyLinkUrl", "Copy link URL"),
       contexts: ["link"],
     });
     chrome.contextMenus.create({
       id: MENU_IDS.QR_PAGE,
-      title: "生成当前页面二维码",
+      title: message("menuQrPage", "Create QR code for this page"),
       contexts: ["page"],
     });
     chrome.contextMenus.create({
       id: MENU_IDS.QR_LINK,
-      title: "生成链接二维码",
+      title: message("menuQrLink", "Create QR code for this link"),
       contexts: ["link"],
     });
     chrome.contextMenus.create({
-      id: MENU_IDS.TOGGLE_FLOAT,
-      title: "切换网页悬浮球",
-      contexts: ["action"],
-    });
-    chrome.contextMenus.create({
       id: MENU_IDS.OPEN_CLEANER,
-      title: "打开书签清理中心",
+      title: message("menuOpenCleaner", "Open bookmark cleaner"),
       contexts: ["action"],
     });
     chrome.contextMenus.create({
       id: MENU_IDS.OPEN_SIDEPANEL,
-      title: "打开 Smart Bookmark 侧边栏",
+      title: message("menuOpenSidePanel", "Open Smart Bookmark side panel"),
       contexts: ["action"],
     });
   });
@@ -73,20 +67,20 @@ async function copyViaTab(tabId: number, text: string) {
   try {
     await chrome.scripting.executeScript({
       target: { tabId },
-      func: (t: string) => {
-        const ta = document.createElement("textarea");
-        ta.value = t;
-        ta.style.position = "fixed";
-        ta.style.opacity = "0";
-        document.body.appendChild(ta);
-        ta.select();
+      func: async (t: string) => {
         try {
+          await navigator.clipboard.writeText(t);
+          return;
+        } catch {
+          const ta = document.createElement("textarea");
+          ta.value = t;
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.select();
           document.execCommand("copy");
-        } catch {}
-        ta.remove();
-        try {
-          navigator.clipboard?.writeText?.(t);
-        } catch {}
+          ta.remove();
+        }
       },
       args: [text],
     });
@@ -100,15 +94,6 @@ async function openQrTab(url: string) {
     `newtab.html#tab=dashboard&qr=${encodeURIComponent(url)}`,
   );
   await chrome.tabs.create({ url: target });
-}
-
-async function toggleFloatingBall() {
-  const { [SETTINGS_KEY]: saved } = await chrome.storage.local.get(SETTINGS_KEY);
-  const settings = saved ?? {};
-  const next = !settings.floatingBall;
-  await chrome.storage.local.set({
-    [SETTINGS_KEY]: { ...settings, floatingBall: next },
-  });
 }
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
@@ -154,10 +139,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       }
       break;
     }
-    case MENU_IDS.TOGGLE_FLOAT: {
-      await toggleFloatingBall();
-      break;
-    }
   }
 });
 
@@ -172,8 +153,6 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
     await chrome.tabs.create({
       url: chrome.runtime.getURL("newtab.html#tab=cleaner"),
     });
-  } else if (command === "toggle-float") {
-    await toggleFloatingBall();
   }
 });
 

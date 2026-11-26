@@ -52,6 +52,13 @@ async function main() {
     console.warn("[postbuild] no _locales folder, skipping");
   }
 
+  const brandIconsSrc = path.join(root, "public", "brand-icons");
+  try {
+    await copyDir(brandIconsSrc, path.join(dist, "brand-icons"));
+  } catch {
+    console.warn("[postbuild] no brand-icons folder, skipping");
+  }
+
   for (const page of ["newtab", "sidepanel", "popup"]) {
     await moveHtmlToRoot(page);
   }

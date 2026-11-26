@@ -3,6 +3,33 @@
     "message": "Smart Bookmark - Cleaner + New Tab"
   },
   "extDescription": {
-    "message": "Clean up bookmarks, turn bookmarks into a new-tab dashboard, and query with AI. MV3 extension for Chrome / Edge."
+    "message": "Local-first bookmark management, cleanup, backup, and a new-tab dashboard for Chrome and Edge."
+  },
+  "menuSearchBookmarks": {
+    "message": "Search Smart Bookmark for \"%s\""
+  },
+  "menuCopyPageUrl": {
+    "message": "Copy page URL"
+  },
+  "menuCopyLinkUrl": {
+    "message": "Copy link URL"
+  },
+  "menuQrPage": {
+    "message": "Create QR code for this page"
+  },
+  "menuQrLink": {
+    "message": "Create QR code for this link"
+  },
+  "menuOpenCleaner": {
+    "message": "Open bookmark cleaner"
+  },
+  "menuOpenSidePanel": {
+    "message": "Open Smart Bookmark side panel"
+  },
+  "commandOpenSidePanel": {
+    "message": "Open Smart Bookmark side panel"
+  },
+  "commandOpenCleaner": {
+    "message": "Open bookmark cleaner"
   }
 }
